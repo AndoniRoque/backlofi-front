@@ -1,5 +1,5 @@
 "use client";
-import { Box, Flex, Image, Text } from "@chakra-ui/react";
+import { Box, Flex, Image, Spinner, Text } from "@chakra-ui/react";
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import games from "../db/backlog";
@@ -18,28 +18,29 @@ function NowPlaying() {
   const fetchCurrentGame = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:3002/search?name=${title}`
+        `${process.env.NEXT_PUBLIC_BASE_URL}search?name=${title}`
       );
       const match = response.data.find(
         (game: { name: string }) =>
           game.name.toLowerCase() === title.toLowerCase()
       );
-      console.log(match);
+
       setSummary(match.summary || "");
+
       const artwork_id = await axios.get(
-        `http://localhost:3002/artworks?id=${match.artworks[0]}`
+        `${process.env.NEXT_PUBLIC_BASE_URL}artworks?id=${match.artworks[0]}`
       );
       const url = artwork_id.data[0].url.replace("t_thumb", "t_original");
       setImgUrl(url);
 
-      // Preload the image to get its dimensions
       const img = new Image();
+
       img.onload = () => {
         // Limit max width to 700px but maintain aspect ratio
         const maxWidth = 700;
         const aspectRatio = img.width / img.height;
-        let newWidth = Math.min(img.width, maxWidth);
-        let newHeight = newWidth / aspectRatio;
+        const newWidth = Math.min(img.width, maxWidth);
+        const newHeight = newWidth / aspectRatio;
 
         setImgDimensions({ width: newWidth, height: newHeight });
         setImageLoaded(true);
@@ -76,7 +77,6 @@ function NowPlaying() {
         overflow="hidden"
         transition="all 0.5s ease-in-out"
       >
-        {/* Background image */}
         <Image
           src={imgUrl ? `https:${imgUrl}` : "/file.svg"}
           position="absolute"
