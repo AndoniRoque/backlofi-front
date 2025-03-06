@@ -1,7 +1,7 @@
 "use client";
 import { Box, Flex, Image, Spinner, Text } from "@chakra-ui/react";
 import axios from "axios";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import games from "../db/backlog";
 
 function NowPlaying() {
@@ -15,28 +15,36 @@ function NowPlaying() {
     height: 500,
   });
 
-  const fetchCurrentGame = async () => {
+  const fetchCurrentGame = useCallback(async () => {
     try {
       const response = await axios.get(
         `${process.env.NEXT_PUBLIC_BASE_URL}search?name=${title}`
       );
+
       const match = response.data.find(
         (game: { name: string }) =>
           game.name.toLowerCase() === title.toLowerCase()
       );
 
+      if (!match) throw new Error("Game not found");
+
       setSummary(match.summary || "");
 
-      const artwork_id = await axios.get(
+      if (!match.artworks || match.artworks.length === 0)
+        throw new Error("No artworks found");
+
+      const artworkResponse = await axios.get(
         `${process.env.NEXT_PUBLIC_BASE_URL}artworks?id=${match.artworks[0]}`
       );
-      const url = artwork_id.data[0].url.replace("t_thumb", "t_original");
-      setImgUrl(url);
+
+      if (!artworkResponse.data || artworkResponse.data.length === 0) {
+        throw new Error("Artwork not found");
+      }
+
+      const url = artworkResponse.data[0].url.replace("t_thumb", "t_original");
 
       const img = new Image();
-
       img.onload = () => {
-        // Limit max width to 700px but maintain aspect ratio
         const maxWidth = 700;
         const aspectRatio = img.width / img.height;
         const newWidth = Math.min(img.width, maxWidth);
@@ -45,16 +53,20 @@ function NowPlaying() {
         setImgDimensions({ width: newWidth, height: newHeight });
         setImageLoaded(true);
       };
+      img.onerror = () => {
+        console.error("Failed to load image");
+      };
       img.src = `https:${url}`;
+
+      setImgUrl(`https:${url}`);
     } catch (error) {
       console.error("Error fetching games: ", error);
-      return [];
     }
-  };
+  }, [title]); // Se asegura de que la función no cambie a menos que `title` cambie
 
   useEffect(() => {
     fetchCurrentGame();
-  }, []);
+  }, [fetchCurrentGame]); // Se incluye `fetchCurrentGame` como dependencia
 
   return (
     <Flex flexDirection={"column"}>
@@ -77,18 +89,33 @@ function NowPlaying() {
         overflow="hidden"
         transition="all 0.5s ease-in-out"
       >
-        <Image
-          src={imgUrl ? `https:${imgUrl}` : "/file.svg"}
-          position="absolute"
-          top="0"
-          left="0"
-          width="100%"
-          height="100%"
-          objectFit="cover"
-          zIndex="0"
-          opacity="0.8"
-          alt={title}
-        />
+        {/* Mostrar el Spinner mientras la imagen se carga */}
+        {!imageLoaded && (
+          <Flex
+            alignItems={"center"}
+            justifyContent={"center"}
+            w={"full"}
+            h={`${imgDimensions.height}px`}
+          >
+            <Spinner size="xl" />
+          </Flex>
+        )}
+
+        {/* Mostrar la imagen solo cuando haya cargado */}
+        {imageLoaded && (
+          <Image
+            src={imgUrl}
+            position="absolute"
+            top="0"
+            left="0"
+            width="100%"
+            height="100%"
+            objectFit="cover"
+            zIndex="0"
+            opacity="0.8"
+            alt={title}
+          />
+        )}
 
         {/* Gradient overlay */}
         <Box
