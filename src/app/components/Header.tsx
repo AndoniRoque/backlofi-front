@@ -1,6 +1,7 @@
 import { Flex } from "@chakra-ui/react";
 import React from "react";
-import ASCIIText from "./ASCIIText";
+
+import GlitchText from "./ASCIIText";
 
 function Header() {
   return (
@@ -11,12 +12,14 @@ function Header() {
       w={500}
       my={10}
     >
-      <ASCIIText
-        text="Backlofi"
-        enableWaves={true}
-        asciiFontSize={4}
-        textFontSize={10}
-      />
+      <GlitchText
+        speed={1}
+        enableShadows={true}
+        enableOnHover={true}
+        className="custom-class"
+      >
+        Backlofi
+      </GlitchText>
     </Flex>
   );
 }
