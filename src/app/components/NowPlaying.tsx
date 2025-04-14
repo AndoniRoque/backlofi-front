@@ -43,7 +43,7 @@ function NowPlaying() {
 
       const url = artworkResponse.data[0].url.replace("t_thumb", "t_original");
 
-      const img = new Image();
+      const img = new window.Image();
       img.onload = () => {
         const maxWidth = 700;
         const aspectRatio = img.width / img.height;
