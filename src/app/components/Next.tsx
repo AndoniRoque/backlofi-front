@@ -34,7 +34,8 @@ interface Game {
   summary: string;
   artworks: string[];
   order: number;
-  name?: string;
+  game?: string;
+  name?: string; // <- agregado
 }
 
 function SortableItem({ game }: { game: Game }) {
@@ -55,12 +56,12 @@ function SortableItem({ game }: { game: Game }) {
 }
 
 function Next() {
-  const query = "";
+  const [query, setQuery] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [results, setResults] = useState<Game[]>([]);
   const [games, setGames] = useState([]);
   const { onClose, onOpen } = useDisclosure();
-  const [selectedGame] = useState(null);
+  const [selectedGame] = useState();
 
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -123,7 +124,7 @@ function Next() {
 
       const newGame = {
         igdbId: game.id,
-        name: game.name.toLowerCase(),
+        name: game?.name?.toLowerCase(),
         summary: game.summary,
         artworks: artworkResponse.data[0].url,
         order: backlogLength.data.total + 1,
@@ -140,8 +141,13 @@ function Next() {
     }
   };
 
-  const handleDragEnd = async (event) => {
+  const handleDragEnd = async (event: {
+    active: { id: string | number };
+    over: { id: string | number } | null;
+  }) => {
     const { active, over } = event;
+
+    if (!active || !over || !over.id || active.id === over.id) return;
 
     if (active.id !== over.id) {
       const oldIndex = games.findIndex((g: Game) => g.id === active.id);
@@ -168,8 +174,10 @@ function Next() {
   };
 
   useEffect(() => {
-    addToBacklog(selectedGame);
-    handleDragEnd(selectedGame);
+    if (selectedGame) {
+      addToBacklog(selectedGame);
+      handleDragEnd(selectedGame);
+    }
   }, []);
 
   return (
@@ -183,7 +191,7 @@ function Next() {
           _hover={{ cursor: "pointer", borderColor: "white" }}
           _active={{ transform: "scale(0.95)" }}
         >
-          <Popover.Root open={isOpen} onClose={onClose}>
+          <Popover.Root>
             <Popover.Trigger>
               <IconButton
                 aria-label="Add"
