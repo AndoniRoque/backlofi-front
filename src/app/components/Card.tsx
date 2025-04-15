@@ -8,7 +8,7 @@ interface CardProps {
 export default function Card({ title }: CardProps) {
   return (
     <Flex border={"2px solid gray"} p={4} m={4} w={500} h={"auto"}>
-      <Text>{title}</Text>
+      <Text>{title.toUpperCase()}</Text>
     </Flex>
   );
 }
