@@ -4,7 +4,15 @@ import React from "react";
 import Card from "./Card";
 import { CSS } from "@dnd-kit/utilities";
 
-function Sortablecard({ game }) {
+interface Game {
+  id: string;
+  title: string;
+  summary: string;
+  artworks: string[];
+  order: number;
+}
+
+function Sortablecard({ game }: { game: Game }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: game.id });
 

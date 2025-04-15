@@ -1,16 +1,5 @@
 "use client";
-import {
-  Box,
-  Flex,
-  IconButton,
-  Input,
-  List,
-  Popover,
-  Portal,
-  Spinner,
-  Text,
-  useDisclosure,
-} from "@chakra-ui/react";
+import { Flex, Text, useDisclosure } from "@chakra-ui/react";
 import {
   DndContext,
   closestCenter,
@@ -29,7 +18,15 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Card from "./Card";
 
-function SortableItem({ game, index }: any) {
+interface Game {
+  id: string;
+  title: string;
+  summary: string;
+  artworks: string[];
+  order: number;
+}
+
+function SortableItem({ game }: { game: Game }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: game.id });
 
@@ -48,11 +45,11 @@ function SortableItem({ game, index }: any) {
 
 function Next() {
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [results, setResults] = useState<Game[]>([]);
   const [games, setGames] = useState([]);
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const [selectedGame, setSelectedGame] = useState(null);
+  const { onClose } = useDisclosure();
+  const [selectedGame] = useState(null);
 
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -132,8 +129,8 @@ function Next() {
     const { active, over } = event;
 
     if (active.id !== over.id) {
-      const oldIndex = games.findIndex((g) => g.id === active.id);
-      const newIndex = games.findIndex((g) => g.id === over.id);
+      const oldIndex = games.findIndex((g: Game) => g.id === active.id);
+      const newIndex = games.findIndex((g: Game) => g.id === over.id);
 
       const newGames = arrayMove(games, oldIndex, newIndex);
 
@@ -141,7 +138,7 @@ function Next() {
 
       // Actualizar backend con el nuevo orden
       try {
-        const updated = newGames.map((game, index) => ({
+        const updated = newGames.map((game: Game, index) => ({
           id: game.id,
           order: index + 1,
         }));
@@ -174,11 +171,11 @@ function Next() {
         onDragEnd={handleDragEnd}
       >
         <SortableContext
-          items={games.map((g) => g.id)}
+          items={games.map((g: Game) => g.id)}
           strategy={verticalListSortingStrategy}
         >
-          {games.map((game, index) => (
-            <SortableItem key={game.id} game={game} index={index} />
+          {games.map((game: Game) => (
+            <SortableItem key={game.id} game={game} />
           ))}
         </SortableContext>
       </DndContext>
