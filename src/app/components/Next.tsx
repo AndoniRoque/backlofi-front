@@ -58,7 +58,7 @@ function Next() {
   const [loading, setLoading] = useState<boolean>(false);
   const [results, setResults] = useState<Game[]>([]);
   const [games, setGames] = useState([]);
-  const { onClose, isOpen, onOpen } = useDisclosure();
+  const { onClose, onOpen } = useDisclosure();
   const [selectedGame] = useState(null);
 
   const sensors = useSensors(useSensor(PointerSensor));
