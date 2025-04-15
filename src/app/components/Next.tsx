@@ -68,7 +68,11 @@ function Next() {
       const response = await axios.get(
         `${process.env.NEXT_PUBLIC_BASE_URL}games`
       );
-      setGames(response.data.sort((a, b) => a.order - b.order));
+      setGames(
+        response.data.sort(
+          (a: { order: number }, b: { order: number }) => a.order - b.order
+        )
+      );
     } catch (error) {
       console.error("Error al obtener los juegos:", error);
     }
