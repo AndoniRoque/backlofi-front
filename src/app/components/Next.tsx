@@ -34,6 +34,7 @@ interface Game {
   summary: string;
   artworks: string[];
   order: number;
+  name?: string;
 }
 
 function SortableItem({ game }: { game: Game }) {
