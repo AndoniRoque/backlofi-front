@@ -260,10 +260,6 @@ function Next() {
         </Text>
       </Flex>
 
-      <Text fontSize={"4xl"} fontWeight={"bold"}>
-        Play next:
-      </Text>
-
       {loading && <Spinner />}
 
       <DndContext
