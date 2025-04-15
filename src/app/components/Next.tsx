@@ -1,5 +1,15 @@
 "use client";
-import { Flex, Text, useDisclosure } from "@chakra-ui/react";
+import {
+  Box,
+  Flex,
+  IconButton,
+  Input,
+  Popover,
+  Portal,
+  Spinner,
+  Text,
+  useDisclosure,
+} from "@chakra-ui/react";
 import {
   DndContext,
   closestCenter,
@@ -44,11 +54,11 @@ function SortableItem({ game }: { game: Game }) {
 }
 
 function Next() {
-  const [query, setQuery] = useState("");
+  const query = "";
   const [loading, setLoading] = useState<boolean>(false);
   const [results, setResults] = useState<Game[]>([]);
   const [games, setGames] = useState([]);
-  const { onClose } = useDisclosure();
+  const { onClose, isOpen, onOpen } = useDisclosure();
   const [selectedGame] = useState(null);
 
   const sensors = useSensors(useSensor(PointerSensor));
@@ -159,11 +169,89 @@ function Next() {
 
   return (
     <Flex flexDirection={"column"} justifyContent={"center"}>
-      {/* Header con popover omitido por brevedad (es igual al original) */}
+      <Flex justifyContent="start" alignItems="center" mb={4}>
+        <Box
+          m={2}
+          border="2px solid transparent"
+          borderRadius="full"
+          transition="border-color 0.2s ease, transform 0.2s ease"
+          _hover={{ cursor: "pointer", borderColor: "white" }}
+          _active={{ transform: "scale(0.95)" }}
+        >
+          <Popover.Root open={isOpen} onClose={onClose}>
+            <Popover.Trigger>
+              <IconButton
+                aria-label="Add"
+                backgroundColor="transparent"
+                color="white"
+                fontWeight="bold"
+                fontSize="3xl"
+                onClick={onOpen}
+              >
+                +
+              </IconButton>
+            </Popover.Trigger>
+            <Portal>
+              <Popover.Content bg="gray.800" color="white" p={3}>
+                <Popover.Arrow />
+                <Input
+                  placeholder="Buscar juego"
+                  size="md"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  mb={2}
+                />
+                {loading && (
+                  <Flex justify="center" p={3}>
+                    <Spinner size="sm" />
+                  </Flex>
+                )}
+                {!loading && results.length > 0 && (
+                  <Flex
+                    direction="column"
+                    gap={1}
+                    maxH="200px"
+                    overflowY="auto"
+                  >
+                    {results.map((game) => (
+                      <Box
+                        key={game.id}
+                        px={3}
+                        py={2}
+                        _hover={{ bg: "whiteAlpha.200", cursor: "pointer" }}
+                        borderRadius="md"
+                        onClick={() => {
+                          addToBacklog(game);
+                          setQuery("");
+                          setResults([]);
+                          onClose();
+                        }}
+                      >
+                        {game.name}
+                      </Box>
+                    ))}
+                  </Flex>
+                )}
+                {!loading && query && results.length === 0 && (
+                  <Text p={3} fontSize="sm" color="gray.400">
+                    Sin resultados.
+                  </Text>
+                )}
+              </Popover.Content>
+            </Portal>
+          </Popover.Root>
+        </Box>
+
+        <Text fontSize="4xl" fontWeight="bold">
+          Play next:
+        </Text>
+      </Flex>
 
       <Text fontSize={"4xl"} fontWeight={"bold"}>
         Play next:
       </Text>
+
+      {loading && <Spinner />}
 
       <DndContext
         sensors={sensors}
