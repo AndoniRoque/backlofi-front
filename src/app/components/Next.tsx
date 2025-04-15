@@ -99,7 +99,7 @@ function Next() {
     return () => clearTimeout(delayDebounce);
   }, [query]);
 
-  const addToBacklog = async (game: any) => {
+  const addToBacklog = async (game: Game) => {
     try {
       if (!game.artworks || game.artworks.length === 0)
         throw new Error("No artworks found");
@@ -135,7 +135,7 @@ function Next() {
     }
   };
 
-  const handleDragEnd = async (event: any) => {
+  const handleDragEnd = async (event) => {
     const { active, over } = event;
 
     if (active.id !== over.id) {
