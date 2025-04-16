@@ -5,7 +5,7 @@ import {
   IconButton,
   Input,
   Popover,
-  Portal,
+  Skeleton,
   Spinner,
   Text,
   useDisclosure,
@@ -57,15 +57,16 @@ function SortableItem({ game }: { game: Game }) {
 
 function Next() {
   const [query, setQuery] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [loadingGames, setLoadingGames] = useState(true);
   const [results, setResults] = useState<Game[]>([]);
   const [games, setGames] = useState([]);
   const { onClose, onOpen } = useDisclosure();
   const [selectedGame] = useState();
-
   const sensors = useSensors(useSensor(PointerSensor));
 
   const getAllGames = async () => {
+    setLoadingGames(true);
     try {
       const response = await axios.get(
         `${process.env.NEXT_PUBLIC_BASE_URL}games`
@@ -77,6 +78,8 @@ function Next() {
       );
     } catch (error) {
       console.error("Error al obtener los juegos:", error);
+    } finally {
+      setLoadingGames(false);
     }
   };
 
@@ -107,28 +110,19 @@ function Next() {
 
   const addToBacklog = async (game: Game) => {
     try {
-      if (!game.artworks || game.artworks.length === 0)
-        throw new Error("No artworks found");
-
-      const artworkResponse = await axios.get(
-        `${process.env.NEXT_PUBLIC_BASE_URL}artworks?id=${game.artworks[0]}`
-      );
-
-      if (!artworkResponse.data || artworkResponse.data.length === 0) {
-        throw new Error("Artwork not found");
-      }
-
       const backlogLength = await axios.get(
         `${process.env.NEXT_PUBLIC_BASE_URL}games/total`
       );
 
       const newGame = {
         igdbId: game.id,
-        name: game?.name?.toLowerCase(),
+        name: game?.name,
         summary: game.summary,
-        artworks: artworkResponse.data[0].url,
+        artworks: game.artworks || [],
         order: backlogLength.data.total + 1,
       };
+
+      console.log(">>>>>>>", newGame);
 
       await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}games`, {
         newGame,
@@ -181,16 +175,9 @@ function Next() {
   }, []);
 
   return (
-    <Flex flexDirection={"column"} justifyContent={"center"}>
-      <Flex justifyContent="start" alignItems="center" mb={4}>
-        <Box
-          m={2}
-          border="2px solid transparent"
-          borderRadius="full"
-          transition="border-color 0.2s ease, transform 0.2s ease"
-          _hover={{ cursor: "pointer", borderColor: "white" }}
-          _active={{ transform: "scale(0.95)" }}
-        >
+    <Flex flexDirection={"column"} justifyContent={"center"} w={600}>
+      <Flex justifyContent="start" alignItems="center" mb={4} w={"full"}>
+        <Box position="relative">
           <Popover.Root>
             <Popover.Trigger>
               <IconButton
@@ -204,54 +191,56 @@ function Next() {
                 +
               </IconButton>
             </Popover.Trigger>
-            <Portal>
-              <Popover.Content bg="gray.800" color="white" p={3}>
-                <Popover.Arrow />
-                <Input
-                  placeholder="Buscar juego"
-                  size="md"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  mb={2}
-                />
-                {loading && (
-                  <Flex justify="center" p={3}>
-                    <Spinner size="sm" />
-                  </Flex>
-                )}
-                {!loading && results.length > 0 && (
-                  <Flex
-                    direction="column"
-                    gap={1}
-                    maxH="200px"
-                    overflowY="auto"
-                  >
-                    {results.map((game) => (
-                      <Box
-                        key={game.id}
-                        px={3}
-                        py={2}
-                        _hover={{ bg: "whiteAlpha.200", cursor: "pointer" }}
-                        borderRadius="md"
-                        onClick={() => {
-                          addToBacklog(game);
-                          setQuery("");
-                          setResults([]);
-                          onClose();
-                        }}
-                      >
-                        {game.name}
-                      </Box>
-                    ))}
-                  </Flex>
-                )}
-                {!loading && query && results.length === 0 && (
-                  <Text p={3} fontSize="sm" color="gray.400">
-                    Sin resultados.
-                  </Text>
-                )}
-              </Popover.Content>
-            </Portal>
+
+            <Popover.Content
+              bg="gray.800"
+              color="white"
+              p={3}
+              zIndex="1"
+              _focus={{ boxShadow: "none" }}
+              position={"absolute"}
+            >
+              <Popover.Arrow />
+              <Input
+                placeholder="Buscar juego"
+                size="md"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                mb={2}
+                p={2}
+              />
+              {loading && (
+                <Flex justify="center" p={3}>
+                  <Spinner size="sm" />
+                </Flex>
+              )}
+              {!loading && results.length > 0 && (
+                <Flex direction="column" gap={1} maxH="200px" overflowY="auto">
+                  {results.map((game) => (
+                    <Box
+                      key={game.id}
+                      px={3}
+                      py={2}
+                      _hover={{ bg: "whiteAlpha.200", cursor: "pointer" }}
+                      borderRadius="md"
+                      onClick={() => {
+                        addToBacklog(game);
+                        setQuery("");
+                        setResults([]);
+                        onClose();
+                      }}
+                    >
+                      {game.name}
+                    </Box>
+                  ))}
+                </Flex>
+              )}
+              {!loading && query && results.length === 0 && (
+                <Text p={3} fontSize="sm" color="gray.400">
+                  Sin resultados.
+                </Text>
+              )}
+            </Popover.Content>
           </Popover.Root>
         </Box>
 
@@ -259,8 +248,6 @@ function Next() {
           Play next:
         </Text>
       </Flex>
-
-      {loading && <Spinner />}
 
       <DndContext
         sensors={sensors}
@@ -271,9 +258,15 @@ function Next() {
           items={games.map((g: Game) => g.id)}
           strategy={verticalListSortingStrategy}
         >
-          {games.map((game: Game) => (
-            <SortableItem key={game.id} game={game} />
-          ))}
+          {loadingGames
+            ? Array.from({ length: 4 }).map((_, index) => (
+                <Box key={index} mb={4} w={"800"}>
+                  <Skeleton height="40px" w={"800"} borderRadius="lg" />
+                </Box>
+              ))
+            : games.map((game: Game) => (
+                <SortableItem key={game.id} game={game} />
+              ))}
         </SortableContext>
       </DndContext>
     </Flex>
