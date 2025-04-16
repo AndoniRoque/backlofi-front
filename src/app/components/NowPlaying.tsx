@@ -1,15 +1,16 @@
 "use client";
-import { Box, Flex, Image, Spinner, Text } from "@chakra-ui/react";
+import { Box, Button, Flex, Image, Spinner, Text } from "@chakra-ui/react";
 import axios from "axios";
 import React, { useCallback, useEffect, useState } from "react";
-import games from "../db/backlog";
 
 function NowPlaying() {
   const [expanded, setExpanded] = useState<boolean>(false);
-  const title = games[0].name;
+  const [title, setTitle] = useState<string>("");
   const [imgUrl, setImgUrl] = useState<string>("");
   const [summary, setSummary] = useState<string>("");
   const [imageLoaded, setImageLoaded] = useState<boolean>(false);
+  const [url, setUrl] = useState<string>("");
+  const [igdbId, setIgdbId] = useState<number>(0);
   const [imgDimensions, setImgDimensions] = useState({
     width: 700,
     height: 500,
@@ -18,51 +19,57 @@ function NowPlaying() {
   const fetchCurrentGame = useCallback(async () => {
     try {
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_BASE_URL}search?name=${title}`
+        `${process.env.NEXT_PUBLIC_BASE_URL}games/current`
       );
+      setTitle(response.data.title || "");
+      setSummary(response.data.synopsis || "");
+      setIgdbId(response.data.igdbId || 0);
 
-      const match = response.data.find(
-        (game: { name: string }) =>
-          game.name.toLowerCase() === title.toLowerCase()
-      );
+      if (response.data.artworks || response.data.artworks.length > 0) {
+        const artworkResponse = await axios.get(
+          `${process.env.NEXT_PUBLIC_BASE_URL}artworks?id=${response.data.artworks[0]}`
+        );
 
-      if (!match) throw new Error("Game not found");
+        console.log("AWKRSE", artworkResponse.data[0].url);
+        const finalUrl = `https:${artworkResponse.data[0].url.replace("t_thumb", "t_original")}`;
+        setUrl(finalUrl);
 
-      setSummary(match.summary || "");
+        if (!url || typeof window === "undefined") return;
 
-      if (!match.artworks || match.artworks.length === 0)
-        throw new Error("No artworks found");
+        const img = new window.Image();
+        img.onload = () => {
+          const maxWidth = 700;
+          const aspectRatio = img.width / img.height;
+          const newWidth = Math.min(img.width, maxWidth);
+          const newHeight = newWidth / aspectRatio;
 
-      const artworkResponse = await axios.get(
-        `${process.env.NEXT_PUBLIC_BASE_URL}artworks?id=${match.artworks[0]}`
-      );
+          setImgDimensions({ width: newWidth, height: newHeight });
+          setImageLoaded(true);
+        };
+        img.onerror = () => {
+          console.error("Failed to load image");
+        };
+        img.src = finalUrl;
 
-      if (!artworkResponse.data || artworkResponse.data.length === 0) {
-        throw new Error("Artwork not found");
+        setImgUrl(finalUrl || "");
       }
-
-      const url = artworkResponse.data[0].url.replace("t_thumb", "t_original");
-
-      const img = new window.Image();
-      img.onload = () => {
-        const maxWidth = 700;
-        const aspectRatio = img.width / img.height;
-        const newWidth = Math.min(img.width, maxWidth);
-        const newHeight = newWidth / aspectRatio;
-
-        setImgDimensions({ width: newWidth, height: newHeight });
-        setImageLoaded(true);
-      };
-      img.onerror = () => {
-        console.error("Failed to load image");
-      };
-      img.src = `https:${url}`;
-
-      setImgUrl(`https:${url}`);
     } catch (error) {
       console.error("Error fetching games: ", error);
     }
-  }, [title]); // Se asegura de que la función no cambie a menos que `title` cambie
+  }, [title]);
+
+  const finishGame = async (igdbId: number) => {
+    try {
+      const { data } = await axios.put(
+        `${process.env.NEXT_PUBLIC_BASE_URL}games/${igdbId}`
+      );
+      console.log("Juego finalizado:", data);
+      fetchCurrentGame();
+    } catch (error) {
+      console.error("Error de red o inesperado:", error);
+      return null;
+    }
+  };
 
   useEffect(() => {
     fetchCurrentGame();
@@ -174,6 +181,24 @@ function NowPlaying() {
           </Text>
         </Flex>
       </Box>
+      <Flex justifyContent={"center"} alignItems={"center"}>
+        <Button
+          backgroundColor={"transparent"}
+          color={"white"}
+          border={"2px solid white"}
+          w={700}
+          _hover={{
+            backgroundColor: "gray",
+          }}
+          _active={{
+            backgroundColor: "transparent",
+            transform: "scale(0.95)",
+          }}
+          onClick={() => finishGame(igdbId)}
+        >
+          Finished
+        </Button>
+      </Flex>
     </Flex>
   );
 }

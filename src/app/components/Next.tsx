@@ -122,8 +122,6 @@ function Next() {
         order: backlogLength.data.total + 1,
       };
 
-      console.log(">>>>>>>", newGame);
-
       await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}games`, {
         newGame,
       });
@@ -161,6 +159,8 @@ function Next() {
         await axios.put(`${process.env.NEXT_PUBLIC_BASE_URL}games/reorder`, {
           orderedGames: updated,
         });
+
+        getAllGames();
       } catch (error) {
         console.error("Error al actualizar el orden:", error);
       }
@@ -179,7 +179,7 @@ function Next() {
       <Flex justifyContent="start" alignItems="center" mb={4} w={"full"}>
         <Box position="relative">
           <Popover.Root>
-            <Popover.Trigger>
+            <Popover.Trigger asChild>
               <IconButton
                 aria-label="Add"
                 backgroundColor="transparent"
