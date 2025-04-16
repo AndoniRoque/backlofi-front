@@ -21,6 +21,7 @@ function NowPlaying() {
       const response = await axios.get(
         `${process.env.NEXT_PUBLIC_BASE_URL}games/current`
       );
+
       setTitle(response.data.title || "");
       setSummary(response.data.synopsis || "");
       setIgdbId(response.data.igdbId || 0);
