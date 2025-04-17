@@ -33,26 +33,25 @@ function NowPlaying() {
 
         console.log("AWKRSE", artworkResponse.data[0].url);
         const finalUrl = `https:${artworkResponse.data[0].url.replace("t_thumb", "t_original")}`;
-        setUrl(finalUrl);
+        if (typeof window !== "undefined") {
+          const img = new window.Image();
+          img.onload = () => {
+            const maxWidth = 700;
+            const aspectRatio = img.width / img.height;
+            const newWidth = Math.min(img.width, maxWidth);
+            const newHeight = newWidth / aspectRatio;
 
-        if (!url || typeof window === "undefined") return;
+            setImgDimensions({ width: newWidth, height: newHeight });
+            setImageLoaded(true);
+          };
+          img.onerror = () => {
+            console.error("Failed to load image");
+          };
+          img.src = finalUrl;
 
-        const img = new window.Image();
-        img.onload = () => {
-          const maxWidth = 700;
-          const aspectRatio = img.width / img.height;
-          const newWidth = Math.min(img.width, maxWidth);
-          const newHeight = newWidth / aspectRatio;
-
-          setImgDimensions({ width: newWidth, height: newHeight });
-          setImageLoaded(true);
-        };
-        img.onerror = () => {
-          console.error("Failed to load image");
-        };
-        img.src = finalUrl;
-
-        setImgUrl(finalUrl || "");
+          setImgUrl(finalUrl || "");
+          setUrl(finalUrl); // Esto es solo si realmente usás `url` en otra parte
+        }
       }
     } catch (error) {
       console.error("Error fetching games: ", error);

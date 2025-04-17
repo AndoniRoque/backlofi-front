@@ -264,9 +264,11 @@ function Next() {
                   <Skeleton height="40px" w={"800"} borderRadius="lg" />
                 </Box>
               ))
-            : games.map((game: Game) => (
-                <SortableItem key={game.id} game={game} />
-              ))}
+            : games
+                .slice(1)
+                .map((game: Game) => (
+                  <SortableItem key={game.id} game={game} />
+                ))}
         </SortableContext>
       </DndContext>
     </Flex>
