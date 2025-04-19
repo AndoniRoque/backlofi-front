@@ -5,7 +5,6 @@ import {
   IconButton,
   Input,
   Popover,
-  Skeleton,
   Spinner,
   Text,
   useDisclosure,
@@ -35,7 +34,7 @@ interface Game {
   artworks: string[];
   order: number;
   game?: string;
-  name?: string; // <- agregado
+  name?: string;
 }
 
 function SortableItem({ game }: { game: Game }) {
@@ -64,30 +63,10 @@ function Next({
 }) {
   const [query, setQuery] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [loadingGames, setLoadingGames] = useState(false);
   const [results, setResults] = useState<Game[]>([]);
-  // const [games, setGames] = useState([]);
   const { onClose, onOpen } = useDisclosure();
   const [selectedGame] = useState();
   const sensors = useSensors(useSensor(PointerSensor));
-
-  // const getAllGames = async () => {
-  //   setLoadingGames(true);
-  //   try {
-  //     const response = await axios.get(
-  //       `${process.env.NEXT_PUBLIC_BASE_URL}games`
-  //     );
-  //     setGames(
-  //       response.data.sort(
-  //         (a: { order: number }, b: { order: number }) => a.order - b.order
-  //       )
-  //     );
-  //   } catch (error) {
-  //     console.error("Error al obtener los juegos:", error);
-  //   } finally {
-  //     setLoadingGames(false);
-  //   }
-  // };
 
   useEffect(() => {
     refreshGames();

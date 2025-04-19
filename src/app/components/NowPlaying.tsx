@@ -16,6 +16,8 @@ function NowPlaying({ onFinish }: { onFinish: () => void }) {
     height: 500,
   });
 
+  console.log(url);
+
   const fetchCurrentGame = useCallback(async () => {
     try {
       const response = await axios.get(
@@ -50,7 +52,7 @@ function NowPlaying({ onFinish }: { onFinish: () => void }) {
           img.src = finalUrl;
 
           setImgUrl(finalUrl || "");
-          setUrl(finalUrl); // Esto es solo si realmente usás `url` en otra parte
+          setUrl(finalUrl);
         }
       }
     } catch (error) {
