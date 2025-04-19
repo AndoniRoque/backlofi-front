@@ -13,7 +13,9 @@ function GameManager() {
       const response = await axios.get(
         `${process.env.NEXT_PUBLIC_BASE_URL}games`
       );
-      const sorted = response.data.sort((a, b) => a.order - b.order);
+      const sorted = response.data.sort(
+        (a: { order: number }, b: { order: number }) => a.order - b.order
+      );
       setGames(sorted);
     } catch (error) {
       console.error("Error al obtener los juegos:", error);
