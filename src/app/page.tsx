@@ -1,6 +1,7 @@
+import GameManager from "./components/Backlofi";
 import Header from "./components/Header";
-import NowPlaying from "./components/NowPlaying";
-import Next from "./components/Next";
+// import NowPlaying from "./components/NowPlaying";
+// import Next from "./components/Next";
 import { Flex } from "@chakra-ui/react";
 
 export default function Home() {
@@ -12,8 +13,9 @@ export default function Home() {
     >
       <Header />
       <Flex justifyContent={"space-around"} flexDirection={"row"} w={"full"}>
-        <NowPlaying />
-        <Next />
+        {/* <NowPlaying />
+        <Next /> */}
+        <GameManager />
       </Flex>
     </Flex>
   );

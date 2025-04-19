@@ -3,7 +3,7 @@ import { Box, Button, Flex, Image, Spinner, Text } from "@chakra-ui/react";
 import axios from "axios";
 import React, { useCallback, useEffect, useState } from "react";
 
-function NowPlaying() {
+function NowPlaying({ onFinish }: { onFinish: () => void }) {
   const [expanded, setExpanded] = useState<boolean>(false);
   const [title, setTitle] = useState<string>("");
   const [imgUrl, setImgUrl] = useState<string>("");
@@ -65,6 +65,7 @@ function NowPlaying() {
       );
       console.log("Juego finalizado:", data);
       fetchCurrentGame();
+      onFinish();
     } catch (error) {
       console.error("Error de red o inesperado:", error);
       return null;

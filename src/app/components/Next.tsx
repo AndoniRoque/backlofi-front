@@ -55,36 +55,42 @@ function SortableItem({ game }: { game: Game }) {
   );
 }
 
-function Next() {
+function Next({
+  games,
+  refreshGames,
+}: {
+  games: Game[];
+  refreshGames: () => void;
+}) {
   const [query, setQuery] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(true);
-  const [loadingGames, setLoadingGames] = useState(true);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [loadingGames, setLoadingGames] = useState(false);
   const [results, setResults] = useState<Game[]>([]);
-  const [games, setGames] = useState([]);
+  // const [games, setGames] = useState([]);
   const { onClose, onOpen } = useDisclosure();
   const [selectedGame] = useState();
   const sensors = useSensors(useSensor(PointerSensor));
 
-  const getAllGames = async () => {
-    setLoadingGames(true);
-    try {
-      const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_BASE_URL}games`
-      );
-      setGames(
-        response.data.sort(
-          (a: { order: number }, b: { order: number }) => a.order - b.order
-        )
-      );
-    } catch (error) {
-      console.error("Error al obtener los juegos:", error);
-    } finally {
-      setLoadingGames(false);
-    }
-  };
+  // const getAllGames = async () => {
+  //   setLoadingGames(true);
+  //   try {
+  //     const response = await axios.get(
+  //       `${process.env.NEXT_PUBLIC_BASE_URL}games`
+  //     );
+  //     setGames(
+  //       response.data.sort(
+  //         (a: { order: number }, b: { order: number }) => a.order - b.order
+  //       )
+  //     );
+  //   } catch (error) {
+  //     console.error("Error al obtener los juegos:", error);
+  //   } finally {
+  //     setLoadingGames(false);
+  //   }
+  // };
 
   useEffect(() => {
-    getAllGames();
+    refreshGames();
   }, []);
 
   useEffect(() => {
@@ -126,7 +132,8 @@ function Next() {
         newGame,
       });
 
-      getAllGames();
+      // getAllGames();
+      refreshGames();
       onClose();
     } catch (error) {
       console.error("Error al agregar el juego:", error);
@@ -147,7 +154,7 @@ function Next() {
 
       const newGames = arrayMove(games, oldIndex, newIndex);
 
-      setGames(newGames);
+      games = newGames;
 
       // Actualizar backend con el nuevo orden
       try {
@@ -160,7 +167,8 @@ function Next() {
           orderedGames: updated,
         });
 
-        getAllGames();
+        // getAllGames();
+        refreshGames();
       } catch (error) {
         console.error("Error al actualizar el orden:", error);
       }
@@ -258,17 +266,9 @@ function Next() {
           items={games.map((g: Game) => g.id)}
           strategy={verticalListSortingStrategy}
         >
-          {loadingGames
-            ? Array.from({ length: 4 }).map((_, index) => (
-                <Box key={index} mb={4} w={"800"}>
-                  <Skeleton height="40px" w={"800"} borderRadius="lg" />
-                </Box>
-              ))
-            : games
-                .slice(1)
-                .map((game: Game) => (
-                  <SortableItem key={game.id} game={game} />
-                ))}
+          {games.slice(1).map((game: Game) => (
+            <SortableItem key={game.id} game={game} />
+          ))}
         </SortableContext>
       </DndContext>
     </Flex>
