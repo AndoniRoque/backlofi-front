@@ -1,9 +1,9 @@
 "use client";
 import Header from "./components/Header";
-import NowPlaying from "./components/NowPlaying";
-import Next from "./components/Next";
 import { Flex } from "@chakra-ui/react";
 import { useState } from "react";
+import NowPlaying from "./components/NowPlaying";
+import Next from "./components/Next";
 
 export default function Home() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
