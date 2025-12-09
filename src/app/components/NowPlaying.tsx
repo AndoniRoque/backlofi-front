@@ -1,9 +1,21 @@
 "use client";
-import { Box, Button, Flex, Image, Spinner, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Flex,
+  IconButton,
+  Image,
+  Spinner,
+  Text,
+} from "@chakra-ui/react";
 import axios from "axios";
 import React, { useCallback, useEffect, useState } from "react";
 
-function NowPlaying() {
+interface NowPlayingProps {
+  onGameChange: () => void;
+}
+
+function NowPlaying({ onGameChange }: NowPlayingProps) {
   const [expanded, setExpanded] = useState<boolean>(false);
   const [title, setTitle] = useState<string>("");
   const [imgUrl, setImgUrl] = useState<string>("");
@@ -31,7 +43,6 @@ function NowPlaying() {
           `${process.env.NEXT_PUBLIC_BASE_URL}artworks?id=${response.data.artworks[0]}`
         );
 
-        console.log("AWKRSE", artworkResponse.data[0].url);
         const finalUrl = `https:${artworkResponse.data[0].url.replace("t_thumb", "t_original")}`;
         setUrl(finalUrl);
 
@@ -66,15 +77,30 @@ function NowPlaying() {
       );
       console.log("Juego finalizado:", data);
       fetchCurrentGame();
+      onGameChange(); // Notifica al componente Next para que se actualice
     } catch (error) {
       console.error("Error de red o inesperado:", error);
       return null;
     }
   };
 
+  const revertGame = async () => {
+    try {
+      const { data } = await axios.put(
+        `${process.env.NEXT_PUBLIC_BASE_URL}games/revert`
+      );
+      console.log("Juego revertido:", data);
+      fetchCurrentGame();
+      onGameChange(); // Notifica al componente Next para que se actualice
+    } catch (error) {
+      console.error("Error revirtiendo juego:", error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     fetchCurrentGame();
-  }, [fetchCurrentGame]); // Se incluye `fetchCurrentGame` como dependencia
+  }, [fetchCurrentGame]);
 
   return (
     <Flex flexDirection={"column"}>
@@ -182,23 +208,46 @@ function NowPlaying() {
           </Text>
         </Flex>
       </Box>
-      <Flex justifyContent={"center"} alignItems={"center"}>
-        <Button
-          backgroundColor={"transparent"}
-          color={"white"}
-          border={"2px solid white"}
-          w={700}
-          _hover={{
-            backgroundColor: "gray",
-          }}
-          _active={{
-            backgroundColor: "transparent",
-            transform: "scale(0.95)",
-          }}
-          onClick={() => finishGame(igdbId)}
-        >
-          Finished
-        </Button>
+      <Flex justifyContent={"center"} alignItems={"center"} gap={2}>
+        <Flex flex={2}>
+          <Button
+            backgroundColor={"transparent"}
+            color={"white"}
+            border={"2px solid white"}
+            w={"full"}
+            _hover={{
+              backgroundColor: "gray",
+            }}
+            _active={{
+              backgroundColor: "transparent",
+              transform: "scale(0.95)",
+            }}
+            onClick={() => finishGame(igdbId)}
+          >
+            Finished
+          </Button>
+        </Flex>
+        <Flex>
+          <IconButton
+            aria-label="Revert"
+            backgroundColor={"transparent"}
+            color={"white"}
+            border={"2px solid white"}
+            w={"full"}
+            _hover={{
+              backgroundColor: "gray",
+            }}
+            _active={{
+              backgroundColor: "transparent",
+              transform: "scale(0.95)",
+            }}
+            onClick={revertGame}
+          >
+            <Text fontSize="xl" color={"#FFF"} fontWeight={"bold"}>
+              {"<"}
+            </Text>
+          </IconButton>
+        </Flex>
       </Flex>
     </Flex>
   );

@@ -35,7 +35,11 @@ interface Game {
   artworks: string[];
   order: number;
   game?: string;
-  name?: string; // <- agregado
+  name?: string;
+}
+
+interface NextProps {
+  refreshTrigger: number;
 }
 
 function SortableItem({ game }: { game: Game }) {
@@ -55,7 +59,7 @@ function SortableItem({ game }: { game: Game }) {
   );
 }
 
-function Next() {
+function Next({ refreshTrigger }: NextProps) {
   const [query, setQuery] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingGames, setLoadingGames] = useState(true);
@@ -86,6 +90,13 @@ function Next() {
   useEffect(() => {
     getAllGames();
   }, []);
+
+  // Este useEffect se ejecuta cada vez que refreshTrigger cambia
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      getAllGames();
+    }
+  }, [refreshTrigger]);
 
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
