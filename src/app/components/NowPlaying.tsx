@@ -28,8 +28,6 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
     height: 500,
   });
 
-  console.log(url);
-
   const fetchCurrentGame = useCallback(async () => {
     try {
       const response = await axios.get(
@@ -46,25 +44,26 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
         );
 
         const finalUrl = `https:${artworkResponse.data[0].url.replace("t_thumb", "t_original")}`;
-        if (typeof window !== "undefined") {
-          const img = new window.Image();
-          img.onload = () => {
-            const maxWidth = 700;
-            const aspectRatio = img.width / img.height;
-            const newWidth = Math.min(img.width, maxWidth);
-            const newHeight = newWidth / aspectRatio;
+        setUrl(finalUrl);
 
-            setImgDimensions({ width: newWidth, height: newHeight });
-            setImageLoaded(true);
-          };
-          img.onerror = () => {
-            console.error("Failed to load image");
-          };
-          img.src = finalUrl;
+        if (!url || typeof window === "undefined") return;
 
-          setImgUrl(finalUrl || "");
-          setUrl(finalUrl);
-        }
+        const img = new window.Image();
+        img.onload = () => {
+          const maxWidth = 700;
+          const aspectRatio = img.width / img.height;
+          const newWidth = Math.min(img.width, maxWidth);
+          const newHeight = newWidth / aspectRatio;
+
+          setImgDimensions({ width: newWidth, height: newHeight });
+          setImageLoaded(true);
+        };
+        img.onerror = () => {
+          console.error("Failed to load image");
+        };
+        img.src = finalUrl;
+
+        setImgUrl(finalUrl || "");
       }
     } catch (error) {
       console.error("Error fetching games: ", error);
