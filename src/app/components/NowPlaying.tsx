@@ -34,19 +34,33 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
         `${process.env.NEXT_PUBLIC_BASE_URL}games/current`
       );
 
-      setTitle(response.data.title || "");
-      setSummary(response.data.synopsis || "");
-      setIgdbId(response.data.igdbId || 0);
+      const newTitle = response.data.title || "";
+      const newSummary = response.data.synopsis || "";
+      const newIgdbId = response.data.igdbId || 0;
 
-      if (response.data.artworks || response.data.artworks.length > 0) {
+      setTitle(newTitle);
+      setSummary(newSummary);
+      setIgdbId(newIgdbId);
+
+      // reset de imagen
+      setImageLoaded(false);
+      setImgUrl("");
+
+      const artworks = response.data.artworks;
+
+      if (artworks && artworks.length > 0) {
         const artworkResponse = await axios.get(
-          `${process.env.NEXT_PUBLIC_BASE_URL}artworks?id=${response.data.artworks[0]}`
+          `${process.env.NEXT_PUBLIC_BASE_URL}artworks?id=${artworks[0]}`
         );
 
-        const finalUrl = `https:${artworkResponse.data[0].url.replace("t_thumb", "t_original")}`;
-        setUrl(finalUrl);
+        const rawUrl = artworkResponse.data?.[0]?.url;
+        if (!rawUrl) return;
 
-        if (!url || typeof window === "undefined") return;
+        const finalUrl = `https:${rawUrl.replace("t_thumb", "t_1080p")}`;
+
+        setImgUrl(finalUrl);
+
+        if (typeof window === "undefined") return;
 
         const img = new window.Image();
         img.onload = () => {
@@ -58,17 +72,13 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
           setImgDimensions({ width: newWidth, height: newHeight });
           setImageLoaded(true);
         };
-        img.onerror = () => {
-          console.error("Failed to load image");
-        };
+        img.onerror = () => console.error("Failed to load image");
         img.src = finalUrl;
-
-        setImgUrl(finalUrl || "");
       }
     } catch (error) {
       console.error("Error fetching games: ", error);
     }
-  }, [title]);
+  }, []);
 
   const finishGame = async (igdbId: number) => {
     try {
