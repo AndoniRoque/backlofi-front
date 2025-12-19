@@ -21,7 +21,7 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
   const [imgUrl, setImgUrl] = useState<string>("");
   const [summary, setSummary] = useState<string>("");
   const [imageLoaded, setImageLoaded] = useState<boolean>(false);
-  const [url, setUrl] = useState<string>("");
+  // const [url, setUrl] = useState<string>("");
   const [igdbId, setIgdbId] = useState<number>(0);
   const [imgDimensions, setImgDimensions] = useState({
     width: 700,
