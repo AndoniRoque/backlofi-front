@@ -80,6 +80,7 @@ function SortableItem({
     <Flex ref={setNodeRef} style={style} w="full" {...attributes}>
       <Card
         title={game.title}
+        artworkId={game.artworks?.[0]}
         position={position}
         onRemove={() => onRemove(game)}
         dragHandleProps={listeners}
@@ -399,7 +400,7 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
             Play Next
           </Text>
           <Text color="whiteAlpha.600" fontSize="sm" whiteSpace="nowrap">
-            {queuedGames.length} en cola
+            {queuedGames.length} in queue
           </Text>
         </Flex>
 
