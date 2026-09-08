@@ -10,7 +10,16 @@ import {
 } from "@chakra-ui/react";
 import axios from "axios";
 import React, { useCallback, useEffect, useState } from "react";
-import { FiCheck, FiChevronDown, FiRotateCcw } from "react-icons/fi";
+import { FiCheck, FiChevronDown, FiRotateCcw, FiShuffle } from "react-icons/fi";
+import {
+  DialogBody,
+  DialogCloseTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogRoot,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface NowPlayingProps {
   onGameChange: () => void;
@@ -24,6 +33,8 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
   const [imageLoaded, setImageLoaded] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [confirmFinishOpen, setConfirmFinishOpen] = useState(false);
+  const [confirmSwapOpen, setConfirmSwapOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState<{
     tone: "success" | "error";
     text: string;
@@ -49,7 +60,6 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
       setSummary(newSummary);
       setIgdbId(newIgdbId);
 
-      // reset de imagen
       setImageLoaded(false);
       setImgUrl("");
 
@@ -59,8 +69,8 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
         const artworkResponse = await axios.get(
           `${process.env.NEXT_PUBLIC_BASE_URL}artworks?id=${artworks[0]}`,
         );
-
         const rawUrl = artworkResponse.data?.[0]?.url;
+
         if (!rawUrl) {
           setImageLoaded(false);
           setIsLoading(false);
@@ -68,7 +78,6 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
         }
 
         const finalUrl = `https:${rawUrl.replace("t_thumb", "t_1080p")}`;
-
         setImgUrl(finalUrl);
 
         if (typeof window === "undefined") return;
@@ -79,7 +88,6 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
           const aspectRatio = img.width / img.height;
           const newWidth = Math.min(img.width, maxWidth);
           const newHeight = newWidth / aspectRatio;
-
           setImgDimensions({ width: newWidth, height: newHeight });
           setImageLoaded(true);
           setIsLoading(false);
@@ -122,16 +130,16 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
     }
   };
 
-  const revertGame = async () => {
+  const undoFinish = async () => {
     setActionLoading(true);
     try {
       const { data } = await axios.put(
-        `${process.env.NEXT_PUBLIC_BASE_URL}games/revert`,
+        `${process.env.NEXT_PUBLIC_BASE_URL}games/undo-finish`,
       );
       console.log("Juego revertido:", data);
       fetchCurrentGame();
       onGameChange(); // Notifica al componente Next para que se actualice
-      setActionMessage({ tone: "success", text: "Previous game restored." });
+      setActionMessage({ tone: "success", text: "Finished action undone." });
     } catch (error) {
       console.error("Error revirtiendo juego:", error);
       setActionMessage({
@@ -139,6 +147,27 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
         text: "Could not restore the previous game.",
       });
       return null;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const swapCurrentGame = async () => {
+    setActionLoading(true);
+    try {
+      await axios.put(`${process.env.NEXT_PUBLIC_BASE_URL}games/revert`);
+      await fetchCurrentGame();
+      onGameChange();
+      setActionMessage({
+        tone: "success",
+        text: "Current game swapped with the next game.",
+      });
+    } catch (error) {
+      console.error("Error swapping current game:", error);
+      setActionMessage({
+        tone: "error",
+        text: "Could not swap games. Make sure the queue is not empty.",
+      });
     } finally {
       setActionLoading(false);
     }
@@ -293,27 +322,111 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
       </Box>
       <Flex justifyContent="center" alignItems="center" gap={2} mt={3}>
         <Flex flex={1}>
-          <Button
-            variant="solid"
-            w="full"
-            loading={actionLoading}
-            disabled={!igdbId}
-            onClick={() => finishGame(igdbId)}
+          <DialogRoot
+            open={confirmFinishOpen}
+            onOpenChange={(details) => setConfirmFinishOpen(details.open)}
           >
-            <FiCheck />
-            Finished
-          </Button>
+            <DialogTrigger asChild>
+              <Button
+                variant="solid"
+                w="full"
+                loading={actionLoading}
+                disabled={!igdbId}
+              >
+                <FiCheck />
+                Finished
+              </Button>
+            </DialogTrigger>
+            <DialogContent bg="gray.800" color="white" maxW="420px" p={6}>
+              <DialogHeader>
+                <DialogTitle>Finish this game?</DialogTitle>
+              </DialogHeader>
+              <DialogBody>
+                <Text color="whiteAlpha.700" mb={5}>
+                  This will move {title} to Played and start the next game in
+                  the queue.
+                </Text>
+                <Flex gap={2} justifyContent="flex-end">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setConfirmFinishOpen(false)}
+                    p={2}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    colorPalette="green"
+                    loading={actionLoading}
+                    onClick={() => {
+                      setConfirmFinishOpen(false);
+                      finishGame(igdbId);
+                    }}
+                    p={2}
+                  >
+                    Finish game
+                  </Button>
+                </Flex>
+              </DialogBody>
+              <DialogCloseTrigger />
+            </DialogContent>
+          </DialogRoot>
         </Flex>
-        <Flex>
-          <IconButton
-            aria-label="Revert to previous game"
-            loading={actionLoading}
-            disabled={!igdbId}
-            onClick={revertGame}
-          >
-            <FiRotateCcw />
-          </IconButton>
-        </Flex>
+        <IconButton
+          aria-label="Undo last finished game"
+          variant="outline"
+          loading={actionLoading}
+          disabled={!igdbId}
+          onClick={undoFinish}
+        >
+          <FiRotateCcw />
+        </IconButton>
+        <DialogRoot
+          open={confirmSwapOpen}
+          onOpenChange={(details) => setConfirmSwapOpen(details.open)}
+        >
+          <DialogTrigger asChild>
+            <IconButton
+              aria-label="Swap current game with next game"
+              variant="outline"
+              loading={actionLoading}
+              disabled={!igdbId}
+            >
+              <FiShuffle />
+            </IconButton>
+          </DialogTrigger>
+          <DialogContent bg="gray.800" color="white" maxW="420px" p={6}>
+            <DialogHeader>
+              <DialogTitle>Play the next game?</DialogTitle>
+            </DialogHeader>
+            <DialogBody>
+              <Text color="whiteAlpha.700" mb={5}>
+                {title} will move to the front of the queue and the next game
+                will become Now Playing.
+              </Text>
+              <Flex gap={2} justifyContent="flex-end">
+                <Button
+                  variant="ghost"
+                  onClick={() => setConfirmSwapOpen(false)}
+                  p={4}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  colorPalette="yellow"
+                  loading={actionLoading}
+                  onClick={() => {
+                    setConfirmSwapOpen(false);
+                    swapCurrentGame();
+                  }}
+                  p={4}
+                >
+                  Switch games
+                </Button>
+              </Flex>
+            </DialogBody>
+            <DialogCloseTrigger />
+          </DialogContent>
+        </DialogRoot>
       </Flex>
       <Text
         minH="20px"

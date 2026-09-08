@@ -105,6 +105,9 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
   const [isSorting, setIsSorting] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<Game | null>(null);
+  const [undoRemoval, setUndoRemoval] = useState<Game | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
   const { open, onClose, onOpen } = useDisclosure();
   const sensors = useSensors(useSensor(PointerSensor));
   const currentGame = games.find((game) => game.playStatus === "PLAYING");
@@ -289,20 +292,66 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
     }
   };
 
-  const removeFromBacklog = async (game: Game) => {
+  const requestRemove = (game: Game) => {
+    setPendingRemoval(game);
+    setUndoRemoval(null);
+  };
+
+  const confirmRemove = async () => {
+    if (!pendingRemoval) return;
+
+    const game = pendingRemoval;
+    setPendingRemoval(null);
+    setIsRemoving(true);
     showFeedback({ tone: "saving", message: `Removing ${game.title}...` });
     try {
       await axios.delete(`${process.env.NEXT_PUBLIC_BASE_URL}games`, {
         data: { igdbId: game.igdbId },
       });
-      await refreshGames();
+      setGames((currentGames) =>
+        currentGames.filter((currentGame) => currentGame.id !== game.id),
+      );
+      setUndoRemoval(game);
       showFeedback({
         tone: "success",
         message: `${game.title} removed from the queue.`,
       });
+      window.setTimeout(() => {
+        setUndoRemoval((currentGame) =>
+          currentGame?.id === game.id ? null : currentGame,
+        );
+      }, 6000);
     } catch (error) {
       console.error("Error al quitar el juego:", error);
+      await refreshGames();
       showFeedback({ tone: "error", message: "Could not remove that game." });
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  const undoRemove = async () => {
+    if (!undoRemoval) return;
+
+    const game = undoRemoval;
+    setUndoRemoval(null);
+    showFeedback({ tone: "saving", message: `Restoring ${game.title}...` });
+    try {
+      await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}games`, {
+        newGame: {
+          igdbId: game.igdbId,
+          name: game.title,
+          summary: game.synopsis || "Sin resumen disponible.",
+          artworks: game.artworks || [],
+          order: game.orden,
+        },
+      });
+      await refreshGames();
+      showFeedback({ tone: "success", message: `${game.title} restored.` });
+    } catch (error) {
+      console.error("Error al restaurar el juego:", error);
+      await refreshGames();
+      showFeedback({ tone: "error", message: "Could not restore that game." });
     }
   };
 
@@ -498,9 +547,61 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
             >
               {feedback.message}
             </Text>
+            {undoRemoval && (
+              <Button
+                size="xs"
+                variant="ghost"
+                colorPalette="yellow"
+                onClick={undoRemove}
+              >
+                Undo
+              </Button>
+            )}
           </Flex>
         )}
       </Flex>
+
+      {pendingRemoval && (
+        <Flex
+          alignItems="center"
+          justifyContent="space-between"
+          gap={3}
+          mb={3}
+          px={3}
+          py={2}
+          border="1px solid"
+          borderColor="red.700"
+          borderRadius="md"
+          bg="red.950"
+        >
+          <Text
+            fontSize="sm"
+            minW={0}
+            overflow="hidden"
+            textOverflow="ellipsis"
+            whiteSpace="nowrap"
+          >
+            Remove <strong>{pendingRemoval.title}</strong> from the queue?
+          </Text>
+          <Flex gap={2} flexShrink={0}>
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => setPendingRemoval(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="xs"
+              colorPalette="red"
+              loading={isRemoving}
+              onClick={confirmRemove}
+            >
+              Remove
+            </Button>
+          </Flex>
+        </Flex>
+      )}
 
       {selectedGame && !isSorting && (
         <Flex
@@ -564,7 +665,7 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
                 key={game.id}
                 game={game}
                 position={index + 2}
-                onRemove={removeFromBacklog}
+                onRemove={requestRemove}
               />
             ))}
           </Flex>
