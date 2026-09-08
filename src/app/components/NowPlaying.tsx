@@ -1,22 +1,32 @@
 "use client";
-import { Box, Button, Flex, Image, Spinner, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Flex,
+  IconButton,
+  Image,
+  Spinner,
+  Text,
+} from "@chakra-ui/react";
 import axios from "axios";
 import React, { useCallback, useEffect, useState } from "react";
 
-function NowPlaying({ onFinish }: { onFinish: () => void }) {
+interface NowPlayingProps {
+  onGameChange: () => void;
+}
+
+function NowPlaying({ onGameChange }: NowPlayingProps) {
   const [expanded, setExpanded] = useState<boolean>(false);
   const [title, setTitle] = useState<string>("");
   const [imgUrl, setImgUrl] = useState<string>("");
   const [summary, setSummary] = useState<string>("");
   const [imageLoaded, setImageLoaded] = useState<boolean>(false);
-  const [url, setUrl] = useState<string>("");
+  // const [url, setUrl] = useState<string>("");
   const [igdbId, setIgdbId] = useState<number>(0);
   const [imgDimensions, setImgDimensions] = useState({
     width: 700,
     height: 500,
   });
-
-  console.log(url);
 
   const fetchCurrentGame = useCallback(async () => {
     try {
@@ -24,41 +34,51 @@ function NowPlaying({ onFinish }: { onFinish: () => void }) {
         `${process.env.NEXT_PUBLIC_BASE_URL}games/current`
       );
 
-      setTitle(response.data.title || "");
-      setSummary(response.data.synopsis || "");
-      setIgdbId(response.data.igdbId || 0);
+      const newTitle = response.data.title || "";
+      const newSummary = response.data.synopsis || "";
+      const newIgdbId = response.data.igdbId || 0;
 
-      if (response.data.artworks || response.data.artworks.length > 0) {
+      setTitle(newTitle);
+      setSummary(newSummary);
+      setIgdbId(newIgdbId);
+
+      // reset de imagen
+      setImageLoaded(false);
+      setImgUrl("");
+
+      const artworks = response.data.artworks;
+
+      if (artworks && artworks.length > 0) {
         const artworkResponse = await axios.get(
-          `${process.env.NEXT_PUBLIC_BASE_URL}artworks?id=${response.data.artworks[0]}`
+          `${process.env.NEXT_PUBLIC_BASE_URL}artworks?id=${artworks[0]}`
         );
 
-        console.log("AWKRSE", artworkResponse.data[0].url);
-        const finalUrl = `https:${artworkResponse.data[0].url.replace("t_thumb", "t_original")}`;
-        if (typeof window !== "undefined") {
-          const img = new window.Image();
-          img.onload = () => {
-            const maxWidth = 700;
-            const aspectRatio = img.width / img.height;
-            const newWidth = Math.min(img.width, maxWidth);
-            const newHeight = newWidth / aspectRatio;
+        const rawUrl = artworkResponse.data?.[0]?.url;
+        if (!rawUrl) return;
 
-            setImgDimensions({ width: newWidth, height: newHeight });
-            setImageLoaded(true);
-          };
-          img.onerror = () => {
-            console.error("Failed to load image");
-          };
-          img.src = finalUrl;
+        const finalUrl = `https:${rawUrl.replace("t_thumb", "t_1080p")}`;
 
-          setImgUrl(finalUrl || "");
-          setUrl(finalUrl);
-        }
+        setImgUrl(finalUrl);
+
+        if (typeof window === "undefined") return;
+
+        const img = new window.Image();
+        img.onload = () => {
+          const maxWidth = 700;
+          const aspectRatio = img.width / img.height;
+          const newWidth = Math.min(img.width, maxWidth);
+          const newHeight = newWidth / aspectRatio;
+
+          setImgDimensions({ width: newWidth, height: newHeight });
+          setImageLoaded(true);
+        };
+        img.onerror = () => console.error("Failed to load image");
+        img.src = finalUrl;
       }
     } catch (error) {
       console.error("Error fetching games: ", error);
     }
-  }, [title]);
+  }, []);
 
   const finishGame = async (igdbId: number) => {
     try {
@@ -67,16 +87,30 @@ function NowPlaying({ onFinish }: { onFinish: () => void }) {
       );
       console.log("Juego finalizado:", data);
       fetchCurrentGame();
-      onFinish();
+      onGameChange(); // Notifica al componente Next para que se actualice
     } catch (error) {
       console.error("Error de red o inesperado:", error);
       return null;
     }
   };
 
+  const revertGame = async () => {
+    try {
+      const { data } = await axios.put(
+        `${process.env.NEXT_PUBLIC_BASE_URL}games/revert`
+      );
+      console.log("Juego revertido:", data);
+      fetchCurrentGame();
+      onGameChange(); // Notifica al componente Next para que se actualice
+    } catch (error) {
+      console.error("Error revirtiendo juego:", error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     fetchCurrentGame();
-  }, [fetchCurrentGame]); // Se incluye `fetchCurrentGame` como dependencia
+  }, [fetchCurrentGame]);
 
   return (
     <Flex flexDirection={"column"}>
@@ -184,23 +218,46 @@ function NowPlaying({ onFinish }: { onFinish: () => void }) {
           </Text>
         </Flex>
       </Box>
-      <Flex justifyContent={"center"} alignItems={"center"}>
-        <Button
-          backgroundColor={"transparent"}
-          color={"white"}
-          border={"2px solid white"}
-          w={700}
-          _hover={{
-            backgroundColor: "gray",
-          }}
-          _active={{
-            backgroundColor: "transparent",
-            transform: "scale(0.95)",
-          }}
-          onClick={() => finishGame(igdbId)}
-        >
-          Finished
-        </Button>
+      <Flex justifyContent={"center"} alignItems={"center"} gap={2}>
+        <Flex flex={2}>
+          <Button
+            backgroundColor={"transparent"}
+            color={"white"}
+            border={"2px solid white"}
+            w={"full"}
+            _hover={{
+              backgroundColor: "gray",
+            }}
+            _active={{
+              backgroundColor: "transparent",
+              transform: "scale(0.95)",
+            }}
+            onClick={() => finishGame(igdbId)}
+          >
+            Finished
+          </Button>
+        </Flex>
+        <Flex>
+          <IconButton
+            aria-label="Revert"
+            backgroundColor={"transparent"}
+            color={"white"}
+            border={"2px solid white"}
+            w={"full"}
+            _hover={{
+              backgroundColor: "gray",
+            }}
+            _active={{
+              backgroundColor: "transparent",
+              transform: "scale(0.95)",
+            }}
+            onClick={revertGame}
+          >
+            <Text fontSize="xl" color={"#FFF"} fontWeight={"bold"}>
+              {"<"}
+            </Text>
+          </IconButton>
+        </Flex>
       </Flex>
     </Flex>
   );

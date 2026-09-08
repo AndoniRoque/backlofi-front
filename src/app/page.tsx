@@ -1,10 +1,17 @@
-import GameManager from "./components/Backlofi";
+"use client";
 import Header from "./components/Header";
-// import NowPlaying from "./components/NowPlaying";
-// import Next from "./components/Next";
 import { Flex } from "@chakra-ui/react";
+import { useState } from "react";
+import NowPlaying from "./components/NowPlaying";
+import Next from "./components/Next";
 
 export default function Home() {
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const triggerRefresh = () => {
+    setRefreshTrigger((prev) => prev + 1);
+  };
+
   return (
     <Flex
       flexDirection={"column"}
@@ -13,9 +20,8 @@ export default function Home() {
     >
       <Header />
       <Flex justifyContent={"space-around"} flexDirection={"row"} w={"full"}>
-        {/* <NowPlaying />
-        <Next /> */}
-        <GameManager />
+        <NowPlaying onGameChange={triggerRefresh} />
+        <Next refreshTrigger={refreshTrigger} />
       </Flex>
     </Flex>
   );

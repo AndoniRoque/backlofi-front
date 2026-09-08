@@ -25,7 +25,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { FiPlus, FiShuffle } from "react-icons/fi";
 import axios from "axios";
 import Card from "./Card";
@@ -77,13 +77,8 @@ function SortableItem({
   );
 }
 
-function Next({
-  games,
-  refreshGames,
-}: {
-  games: Game[];
-  refreshGames: () => void;
-}) {
+function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
+  const [games, setGames] = useState<Game[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<SearchGame[]>([]);
@@ -94,9 +89,23 @@ function Next({
   const currentGame = games.find((game) => game.playStatus === "PLAYING");
   const queuedGames = games.filter((game) => game.playStatus === "BACKLOG");
 
+  const refreshGames = useCallback(async () => {
+    try {
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_BASE_URL}games`,
+      );
+      const sortedGames = response.data.sort(
+        (a: Game, b: Game) => a.orden - b.orden,
+      );
+      setGames(sortedGames);
+    } catch (error) {
+      console.error("Error al obtener los juegos:", error);
+    }
+  }, []);
+
   useEffect(() => {
     refreshGames();
-  }, [refreshGames]);
+  }, [refreshGames, refreshTrigger]);
 
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
