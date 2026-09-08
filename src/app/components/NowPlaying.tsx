@@ -24,6 +24,10 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
   const [imageLoaded, setImageLoaded] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
   const [igdbId, setIgdbId] = useState<number>(0);
   const [imgDimensions, setImgDimensions] = useState({
     width: 700,
@@ -108,8 +112,10 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
       console.log("Juego finalizado:", data);
       fetchCurrentGame();
       onGameChange(); // Notifica al componente Next para que se actualice
+      setActionMessage({ tone: "success", text: "Game marked as finished." });
     } catch (error) {
       console.error("Error de red o inesperado:", error);
+      setActionMessage({ tone: "error", text: "Could not finish this game." });
       return null;
     } finally {
       setActionLoading(false);
@@ -125,8 +131,13 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
       console.log("Juego revertido:", data);
       fetchCurrentGame();
       onGameChange(); // Notifica al componente Next para que se actualice
+      setActionMessage({ tone: "success", text: "Previous game restored." });
     } catch (error) {
       console.error("Error revirtiendo juego:", error);
+      setActionMessage({
+        tone: "error",
+        text: "Could not restore the previous game.",
+      });
       return null;
     } finally {
       setActionLoading(false);
@@ -304,6 +315,15 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
           </IconButton>
         </Flex>
       </Flex>
+      <Text
+        minH="20px"
+        mt={2}
+        fontSize="xs"
+        textAlign="center"
+        color={actionMessage?.tone === "error" ? "red.300" : "green.300"}
+      >
+        {actionMessage?.text}
+      </Text>
     </Flex>
   );
 }

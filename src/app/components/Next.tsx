@@ -58,6 +58,11 @@ interface SearchGame {
   first_release_date?: number;
 }
 
+type Feedback = {
+  tone: "success" | "error" | "saving";
+  message: string;
+};
+
 function SortableItem({
   game,
   position,
@@ -99,10 +104,15 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isSorting, setIsSorting] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const { open, onClose, onOpen } = useDisclosure();
   const sensors = useSensors(useSensor(PointerSensor));
   const currentGame = games.find((game) => game.playStatus === "PLAYING");
   const queuedGames = games.filter((game) => game.playStatus === "BACKLOG");
+
+  const showFeedback = useCallback((nextFeedback: Feedback) => {
+    setFeedback(nextFeedback);
+  }, []);
 
   const refreshGames = useCallback(async () => {
     try {
@@ -123,6 +133,7 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
   }, [refreshGames, refreshTrigger]);
 
   useEffect(() => {
+    const controller = new AbortController();
     const delayDebounce = setTimeout(() => {
       if (query.trim().length > 2) {
         setLoading(true);
@@ -130,27 +141,35 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
         axios
           .get(
             `${process.env.NEXT_PUBLIC_BASE_URL}search?name=${encodeURIComponent(query.trim())}`,
+            { signal: controller.signal },
           )
           .then((res) => setResults(res.data))
           .catch((error) => {
+            if (controller.signal.aborted) return;
             console.error("Error al buscar:", error);
             setResults([]);
             setSearchError(true);
           })
-          .finally(() => setLoading(false));
+          .finally(() => {
+            if (!controller.signal.aborted) setLoading(false);
+          });
       } else {
         setResults([]);
         setSearchError(false);
       }
     }, 500);
 
-    return () => clearTimeout(delayDebounce);
+    return () => {
+      clearTimeout(delayDebounce);
+      controller.abort();
+    };
   }, [query]);
 
   const addToBacklog = async (game: SearchGame) => {
     if (games.some((existingGame) => existingGame.igdbId === game.id)) return;
 
     setAddingId(game.id);
+    showFeedback({ tone: "saving", message: "Adding game..." });
     try {
       const backlogLength = await axios.get(
         `${process.env.NEXT_PUBLIC_BASE_URL}games/total`,
@@ -166,12 +185,17 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
         },
       });
 
-      refreshGames();
+      await refreshGames();
       setQuery("");
       setResults([]);
       onClose();
+      showFeedback({
+        tone: "success",
+        message: `${game.name} added to the queue.`,
+      });
     } catch (error) {
       console.error("Error al agregar el juego:", error);
+      showFeedback({ tone: "error", message: "Could not add that game." });
     } finally {
       setAddingId(null);
     }
@@ -215,11 +239,17 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
 
     applyLocalOrder(orderedGames);
     setIsReordering(true);
+    showFeedback({ tone: "saving", message: "Saving queue order..." });
     try {
       await persistOrder(orderedGames);
+      showFeedback({ tone: "success", message: "Queue order saved." });
     } catch (error) {
       console.error("Error al actualizar el orden:", error);
       await refreshGames();
+      showFeedback({
+        tone: "error",
+        message: "Could not save the queue order.",
+      });
     } finally {
       setIsReordering(false);
     }
@@ -239,25 +269,40 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
     setIsSorting(true);
     setSelectedGame(randomGame);
     applyLocalOrder(shuffledGames);
+    showFeedback({ tone: "saving", message: "Saving the next game..." });
     try {
       await persistOrder(shuffledGames);
+      showFeedback({
+        tone: "success",
+        message: `${randomGame.title} is next.`,
+      });
     } catch (error) {
       console.error("Error al sortear el próximo juego:", error);
       setSelectedGame(null);
       await refreshGames();
+      showFeedback({
+        tone: "error",
+        message: "Could not save the selected game.",
+      });
     } finally {
       setIsSorting(false);
     }
   };
 
   const removeFromBacklog = async (game: Game) => {
+    showFeedback({ tone: "saving", message: `Removing ${game.title}...` });
     try {
       await axios.delete(`${process.env.NEXT_PUBLIC_BASE_URL}games`, {
         data: { igdbId: game.igdbId },
       });
-      refreshGames();
+      await refreshGames();
+      showFeedback({
+        tone: "success",
+        message: `${game.title} removed from the queue.`,
+      });
     } catch (error) {
       console.error("Error al quitar el juego:", error);
+      showFeedback({ tone: "error", message: "Could not remove that game." });
     }
   };
 
@@ -435,6 +480,26 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
           <FiShuffle />
           Random game
         </Button>
+      </Flex>
+
+      <Flex minH="24px" alignItems="center" mb={2} px={1} role="status">
+        {feedback && (
+          <Flex alignItems="center" gap={2}>
+            {feedback.tone === "saving" && <Spinner size="xs" />}
+            <Text
+              fontSize="xs"
+              color={
+                feedback.tone === "error"
+                  ? "red.300"
+                  : feedback.tone === "success"
+                    ? "green.300"
+                    : "whiteAlpha.600"
+              }
+            >
+              {feedback.message}
+            </Text>
+          </Flex>
+        )}
       </Flex>
 
       {selectedGame && !isSorting && (
