@@ -10,6 +10,7 @@ import {
 } from "@chakra-ui/react";
 import axios from "axios";
 import React, { useCallback, useEffect, useState } from "react";
+import { FiCheck, FiChevronDown, FiRotateCcw } from "react-icons/fi";
 
 interface NowPlayingProps {
   onGameChange: () => void;
@@ -21,7 +22,8 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
   const [imgUrl, setImgUrl] = useState<string>("");
   const [summary, setSummary] = useState<string>("");
   const [imageLoaded, setImageLoaded] = useState<boolean>(false);
-  // const [url, setUrl] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [igdbId, setIgdbId] = useState<number>(0);
   const [imgDimensions, setImgDimensions] = useState({
     width: 700,
@@ -29,9 +31,10 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
   });
 
   const fetchCurrentGame = useCallback(async () => {
+    setIsLoading(true);
     try {
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_BASE_URL}games/current`
+        `${process.env.NEXT_PUBLIC_BASE_URL}games/current`,
       );
 
       const newTitle = response.data.title || "";
@@ -50,11 +53,15 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
 
       if (artworks && artworks.length > 0) {
         const artworkResponse = await axios.get(
-          `${process.env.NEXT_PUBLIC_BASE_URL}artworks?id=${artworks[0]}`
+          `${process.env.NEXT_PUBLIC_BASE_URL}artworks?id=${artworks[0]}`,
         );
 
         const rawUrl = artworkResponse.data?.[0]?.url;
-        if (!rawUrl) return;
+        if (!rawUrl) {
+          setImageLoaded(false);
+          setIsLoading(false);
+          return;
+        }
 
         const finalUrl = `https:${rawUrl.replace("t_thumb", "t_1080p")}`;
 
@@ -71,19 +78,32 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
 
           setImgDimensions({ width: newWidth, height: newHeight });
           setImageLoaded(true);
+          setIsLoading(false);
         };
-        img.onerror = () => console.error("Failed to load image");
+        img.onerror = () => {
+          setImageLoaded(false);
+          setIsLoading(false);
+        };
         img.src = finalUrl;
+      } else {
+        setImageLoaded(false);
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Error fetching games: ", error);
+      setTitle("");
+      setSummary("");
+      setIgdbId(0);
+      setImageLoaded(false);
+      setIsLoading(false);
     }
   }, []);
 
   const finishGame = async (igdbId: number) => {
+    setActionLoading(true);
     try {
       const { data } = await axios.put(
-        `${process.env.NEXT_PUBLIC_BASE_URL}games/${igdbId}`
+        `${process.env.NEXT_PUBLIC_BASE_URL}games/${igdbId}`,
       );
       console.log("Juego finalizado:", data);
       fetchCurrentGame();
@@ -91,13 +111,16 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
     } catch (error) {
       console.error("Error de red o inesperado:", error);
       return null;
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const revertGame = async () => {
+    setActionLoading(true);
     try {
       const { data } = await axios.put(
-        `${process.env.NEXT_PUBLIC_BASE_URL}games/revert`
+        `${process.env.NEXT_PUBLIC_BASE_URL}games/revert`,
       );
       console.log("Juego revertido:", data);
       fetchCurrentGame();
@@ -105,6 +128,8 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
     } catch (error) {
       console.error("Error revirtiendo juego:", error);
       return null;
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -113,40 +138,66 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
   }, [fetchCurrentGame]);
 
   return (
-    <Flex flexDirection={"column"}>
-      <Flex justifyContent={"start"} alignItems={"start"} w={700}>
-        <Text fontSize="4xl" fontWeight="bold" textAlign={"left"}>
-          Now Playing...
+    <Flex flexDirection="column" w="full" maxW="700px">
+      <Flex
+        justifyContent="space-between"
+        alignItems="baseline"
+        w="full"
+        px={1}
+      >
+        <Text fontSize={{ base: "2xl", md: "4xl" }} fontWeight="bold">
+          Now Playing
         </Text>
+        {title && (
+          <Text color="whiteAlpha.600" fontSize="xs" textTransform="uppercase">
+            In progress
+          </Text>
+        )}
       </Flex>
 
-      {/* Background container */}
       <Box
         position="relative"
-        width={`${imgDimensions.width}px`}
-        height={expanded ? "auto" : `${imgDimensions.height}px`}
-        minHeight={`${imgDimensions.height}px`}
-        maxWidth="700px"
-        m={4}
-        border={"3px solid white"}
+        width="full"
+        height={expanded ? "auto" : { base: "360px", md: "500px" }}
+        minHeight={{ base: "360px", md: "500px" }}
+        mt={4}
+        border="1px solid"
+        borderColor="whiteAlpha.400"
         borderRadius="md"
         overflow="hidden"
-        transition="all 0.5s ease-in-out"
+        bg="whiteAlpha.100"
+        transition="height 0.5s ease-in-out, border-color 0.2s"
       >
-        {/* Mostrar el Spinner mientras la imagen se carga */}
-        {!imageLoaded && (
+        {isLoading && (
           <Flex
             alignItems={"center"}
             justifyContent={"center"}
             w={"full"}
-            h={`${imgDimensions.height}px`}
+            h="full"
           >
             <Spinner size="xl" />
           </Flex>
         )}
 
-        {/* Mostrar la imagen solo cuando haya cargado */}
-        {imageLoaded && (
+        {!isLoading && !title && (
+          <Flex
+            direction="column"
+            alignItems="center"
+            justifyContent="center"
+            h="full"
+            p={8}
+            textAlign="center"
+          >
+            <Text fontSize="2xl" fontWeight="bold">
+              No game in progress
+            </Text>
+            <Text color="whiteAlpha.600" mt={2}>
+              Choose the next game from the queue.
+            </Text>
+          </Flex>
+        )}
+
+        {!isLoading && imageLoaded && (
           <Image
             src={imgUrl}
             position="absolute"
@@ -156,106 +207,100 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
             height="100%"
             objectFit="cover"
             zIndex="0"
-            opacity="0.8"
+            opacity="0.72"
             alt={title}
           />
         )}
 
-        {/* Gradient overlay */}
-        <Box
-          position="absolute"
-          top="0"
-          left="0"
-          width="100%"
-          height="100%"
-          background="linear-gradient(to bottom, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.8) 100%)"
-          zIndex="1"
-        />
+        {title && (
+          <Box
+            position="absolute"
+            inset="0"
+            background="linear-gradient(to bottom, rgba(0,0,0,0.05) 20%, rgba(0,0,0,0.88) 100%)"
+            zIndex="1"
+          />
+        )}
 
-        {/* Content */}
-        <Flex
-          flexDirection="column"
-          position="relative"
-          zIndex="2"
-          width={"full"}
-          p={4}
-          color="white"
-          cursor="pointer"
-          onClick={() => setExpanded(!expanded)}
-          alignItems={"center"}
-          h={"full"}
-        >
-          <Text fontSize="5xl" fontWeight="bold" textAlign="start" w={"full"}>
-            {title}
-          </Text>
-
-          {/* Summary text */}
-          <Text
-            fontSize="lg"
-            mt={2}
-            opacity={expanded ? 1 : 0}
-            maxHeight={expanded ? "1000px" : "0"}
-            margin={expanded ? "16px 0" : "0"}
-            padding={expanded ? "8px 0" : "0"}
-            transition="all 0.6s ease-in-out"
-            overflow="hidden"
-            w={"full"}
+        {title && (
+          <Flex
+            flexDirection="column"
+            position="relative"
+            zIndex="2"
+            width="full"
+            minH="full"
+            p={{ base: 5, md: 7 }}
+            pb={{ base: 12, md: 14 }}
+            color="white"
+            cursor="pointer"
+            onClick={() => setExpanded(!expanded)}
           >
-            {summary}
-          </Text>
+            <Text
+              fontSize={{ base: "3xl", md: "5xl" }}
+              fontWeight="bold"
+              lineHeight="1.05"
+              maxW="90%"
+            >
+              {title}
+            </Text>
 
-          {/* Click to expand text */}
-          <Text
+            <Text
+              fontSize={{ base: "md", md: "lg" }}
+              mt={4}
+              opacity={expanded ? 1 : 0}
+              maxHeight={expanded ? "1000px" : "0"}
+              transition="all 0.5s ease-in-out"
+              overflow="hidden"
+              maxW="680px"
+            >
+              {summary || "No description available."}
+            </Text>
+          </Flex>
+        )}
+
+        {title && (
+          <Flex
+            position="absolute"
+            bottom={{ base: 5, md: 7 }}
+            left={{ base: 5, md: 7 }}
+            alignItems="center"
+            gap={2}
+            color="whiteAlpha.700"
             fontSize="sm"
-            mt="auto"
-            opacity={expanded ? 0 : 0.7}
-            maxHeight={expanded ? "0" : "20px"}
-            transition="all 0.3s ease-in-out"
-            overflow="hidden"
-            textAlign="center"
+            zIndex="3"
+            cursor="pointer"
+            onClick={() => setExpanded(!expanded)}
           >
-            Click to expand...
-          </Text>
-        </Flex>
+            <Text>{expanded ? "Hide description" : "Read description"}</Text>
+            <Box
+              transform={expanded ? "rotate(180deg)" : "none"}
+              transition="transform 0.3s"
+            >
+              <FiChevronDown />
+            </Box>
+          </Flex>
+        )}
       </Box>
-      <Flex justifyContent={"center"} alignItems={"center"} gap={2}>
-        <Flex flex={2}>
+      <Flex justifyContent="center" alignItems="center" gap={2} mt={3}>
+        <Flex flex={1}>
           <Button
-            backgroundColor={"transparent"}
-            color={"white"}
-            border={"2px solid white"}
-            w={"full"}
-            _hover={{
-              backgroundColor: "gray",
-            }}
-            _active={{
-              backgroundColor: "transparent",
-              transform: "scale(0.95)",
-            }}
+            variant="solid"
+            w="full"
+            loading={actionLoading}
+            disabled={!igdbId}
             onClick={() => finishGame(igdbId)}
           >
+            <FiCheck />
             Finished
           </Button>
         </Flex>
         <Flex>
           <IconButton
-            aria-label="Revert"
-            backgroundColor={"transparent"}
-            color={"white"}
-            border={"2px solid white"}
-            w={"full"}
-            _hover={{
-              backgroundColor: "gray",
-            }}
-            _active={{
-              backgroundColor: "transparent",
-              transform: "scale(0.95)",
-            }}
+            aria-label="Revert to previous game"
+            loading={actionLoading}
+            disabled={!igdbId}
             onClick={revertGame}
           >
-            <Text fontSize="xl" color={"#FFF"} fontWeight={"bold"}>
-              {"<"}
-            </Text>
+            <FiRotateCcw />
           </IconButton>
         </Flex>
       </Flex>
