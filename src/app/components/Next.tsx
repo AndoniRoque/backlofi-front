@@ -5,7 +5,7 @@ import {
   Flex,
   IconButton,
   Input,
-  Popover,
+  Image,
   Spinner,
   Text,
   useDisclosure,
@@ -26,9 +26,18 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import React, { useCallback, useEffect, useState } from "react";
-import { FiPlus, FiShuffle } from "react-icons/fi";
+import { FiPlus, FiSearch, FiShuffle } from "react-icons/fi";
 import axios from "axios";
 import Card from "./Card";
+import {
+  DialogBody,
+  DialogCloseTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogRoot,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface Game {
   id: number;
@@ -45,6 +54,8 @@ interface SearchGame {
   name: string;
   summary?: string;
   artworks?: number[];
+  cover?: { url?: string };
+  first_release_date?: number;
 }
 
 function SortableItem({
@@ -81,10 +92,12 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
   const [games, setGames] = useState<Game[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const [results, setResults] = useState<SearchGame[]>([]);
+  const [addingId, setAddingId] = useState<number | null>(null);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isSorting, setIsSorting] = useState(false);
-  const { onClose, onOpen } = useDisclosure();
+  const { open, onClose, onOpen } = useDisclosure();
   const sensors = useSensors(useSensor(PointerSensor));
   const currentGame = games.find((game) => game.playStatus === "PLAYING");
   const queuedGames = games.filter((game) => game.playStatus === "BACKLOG");
@@ -111,20 +124,31 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
     const delayDebounce = setTimeout(() => {
       if (query.trim().length > 2) {
         setLoading(true);
+        setSearchError(false);
         axios
-          .get(`${process.env.NEXT_PUBLIC_BASE_URL}search?name=${query}`)
+          .get(
+            `${process.env.NEXT_PUBLIC_BASE_URL}search?name=${encodeURIComponent(query.trim())}`,
+          )
           .then((res) => setResults(res.data))
-          .catch((error) => console.error("Error al buscar:", error))
+          .catch((error) => {
+            console.error("Error al buscar:", error);
+            setResults([]);
+            setSearchError(true);
+          })
           .finally(() => setLoading(false));
       } else {
         setResults([]);
+        setSearchError(false);
       }
-    }, 1000);
+    }, 500);
 
     return () => clearTimeout(delayDebounce);
   }, [query]);
 
   const addToBacklog = async (game: SearchGame) => {
+    if (games.some((existingGame) => existingGame.igdbId === game.id)) return;
+
+    setAddingId(game.id);
     try {
       const backlogLength = await axios.get(
         `${process.env.NEXT_PUBLIC_BASE_URL}games/total`,
@@ -134,7 +158,7 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
         newGame: {
           igdbId: game.id,
           name: game.name,
-          summary: game.summary,
+          summary: game.summary || "Sin resumen disponible.",
           artworks: game.artworks || [],
           order: backlogLength.data.total + 1,
         },
@@ -146,6 +170,8 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
       onClose();
     } catch (error) {
       console.error("Error al agregar el juego:", error);
+    } finally {
+      setAddingId(null);
     }
   };
 
@@ -218,54 +244,159 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
   return (
     <Flex flexDirection="column" justifyContent="center" w="full" maxW="600px">
       <Flex justifyContent="space-between" alignItems="center" mb={5} gap={3}>
-        <Popover.Root>
-          <Popover.Trigger asChild>
-            <IconButton
-              aria-label="Agregar juego"
-              backgroundColor="transparent"
-              color="white"
-              size="sm"
-              onClick={onOpen}
-            >
+        <DialogRoot
+          open={open}
+          onOpenChange={(details) => (details.open ? onOpen() : onClose())}
+          size="lg"
+          placement="center"
+        >
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm" p={4}>
               <FiPlus />
-            </IconButton>
-          </Popover.Trigger>
-          <Popover.Content bg="gray.800" color="white" p={3} zIndex="1">
-            <Popover.Arrow />
-            <Input
-              placeholder="Buscar juego"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              mb={2}
-            />
-            {loading && <Spinner size="sm" />}
-            {!loading && results.length > 0 && (
-              <Flex direction="column" gap={1} maxH="200px" overflowY="auto">
-                {results.map((game) => (
-                  <Box
-                    key={game.id}
-                    px={3}
-                    py={2}
-                    borderRadius="md"
-                    _hover={{ bg: "whiteAlpha.200", cursor: "pointer" }}
-                    onClick={() => addToBacklog(game)}
-                  >
-                    {game.name}
-                  </Box>
-                ))}
+              Add
+            </Button>
+          </DialogTrigger>
+          <DialogContent
+            bg="gray.800"
+            color="white"
+            p={4}
+            w="full"
+            maxW="560px"
+            maxH="calc(100vh - 32px)"
+            overflow="hidden"
+          >
+            <DialogHeader p={1}>
+              <DialogTitle>Add game</DialogTitle>
+            </DialogHeader>
+            <DialogBody
+              display="flex"
+              flexDirection="column"
+              p={1}
+              overflow="hidden"
+            >
+              <Flex alignItems="center" gap={2} mb={3} flexShrink={0}>
+                <Box color="whiteAlpha.600">
+                  <FiSearch />
+                </Box>
+                <Input
+                  autoFocus
+                  placeholder="Search title..."
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  px={2}
+                />
               </Flex>
-            )}
-            {!loading && query && results.length === 0 && (
-              <Text p={3} fontSize="sm" color="gray.400">
-                Sin resultados.
-              </Text>
-            )}
-          </Popover.Content>
-        </Popover.Root>
+              <Box minH="120px" overflow="hidden">
+                {query.trim().length > 0 && query.trim().length < 3 && (
+                  <Text color="whiteAlpha.600" fontSize="sm" px={2} py={3}>
+                    Type three characters or more to search.
+                  </Text>
+                )}
+                {loading && (
+                  <Flex alignItems="center" gap={2} px={2} py={3}>
+                    <Spinner size="sm" />
+                    <Text fontSize="sm" color="whiteAlpha.700">
+                      Searching database...
+                    </Text>
+                  </Flex>
+                )}
+                {!loading && results.length > 0 && (
+                  <Flex
+                    direction="column"
+                    gap={1}
+                    maxH={{ base: "calc(100vh - 220px)", sm: "320px" }}
+                    overflowY="auto"
+                    p={2}
+                  >
+                    {results.map((game) => (
+                      <Flex
+                        key={game.id}
+                        alignItems="center"
+                        gap={3}
+                        p={4}
+                        borderRadius="md"
+                        _hover={{ bg: "whiteAlpha.200" }}
+                      >
+                        {game.cover?.url ? (
+                          <Image
+                            src={`https:${game.cover.url.replace("t_thumb", "t_cover_small")}`}
+                            alt=""
+                            w="40px"
+                            h="52px"
+                            objectFit="cover"
+                            borderRadius="sm"
+                          />
+                        ) : (
+                          <Flex
+                            w="40px"
+                            h="52px"
+                            bg="whiteAlpha.200"
+                            borderRadius="sm"
+                            alignItems="center"
+                            justifyContent="center"
+                          >
+                            <FiSearch />
+                          </Flex>
+                        )}
+                        <Box flex="1" minW={0}>
+                          <Text
+                            fontWeight="bold"
+                            overflow="hidden"
+                            textOverflow="ellipsis"
+                            whiteSpace="nowrap"
+                          >
+                            {game.name}
+                          </Text>
+                          <Text fontSize="xs" color="whiteAlpha.600">
+                            {game.first_release_date
+                              ? new Date(
+                                  game.first_release_date * 1000,
+                                ).getFullYear()
+                              : "Año desconocido"}
+                          </Text>
+                        </Box>
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          loading={addingId === game.id}
+                          disabled={games.some(
+                            (existingGame) => existingGame.igdbId === game.id,
+                          )}
+                          onClick={() => addToBacklog(game)}
+                          p={4}
+                        >
+                          {games.some(
+                            (existingGame) => existingGame.igdbId === game.id,
+                          )
+                            ? "In queue"
+                            : "Add"}
+                        </Button>
+                      </Flex>
+                    ))}
+                  </Flex>
+                )}
+                {!loading && searchError && (
+                  <Text p={3} fontSize="sm" color="red.300">
+                    The search couldn&apos;t be completed. Please try again.
+                  </Text>
+                )}
+                {!loading &&
+                  !searchError &&
+                  query.trim().length > 2 &&
+                  results.length === 0 && (
+                    <Text p={3} fontSize="sm" color="gray.400">
+                      No results found.
+                    </Text>
+                  )}
+              </Box>
+            </DialogBody>
+            <DialogCloseTrigger />
+          </DialogContent>
+        </DialogRoot>
 
         <Flex alignItems="center" gap={3} flex="1">
           <Text fontSize={{ base: "2xl", md: "3xl" }} fontWeight="bold">
-            Próximos juegos
+            Play Next
           </Text>
           <Text color="whiteAlpha.600" fontSize="sm" whiteSpace="nowrap">
             {queuedGames.length} en cola
@@ -279,9 +410,10 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
           loading={isSorting}
           disabled={games.length < 2}
           onClick={shuffleNext}
+          p={4}
         >
           <FiShuffle />
-          Sortear próximo
+          Random game
         </Button>
       </Flex>
 
@@ -321,14 +453,14 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
             variant="ghost"
             onClick={() => setSelectedGame(null)}
           >
-            Ocultar
+            Hide
           </Button>
         </Flex>
       )}
 
       {queuedGames.length === 0 && (
         <Text color="whiteAlpha.600" py={8} textAlign="center">
-          La cola está vacía. Agrega juegos para empezar.
+          Queue is empty. Add games to your backlog to see them here.
         </Text>
       )}
 
