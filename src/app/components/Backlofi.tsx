@@ -11,10 +11,10 @@ function GameManager() {
   const getAllGames = useCallback(async () => {
     try {
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_BASE_URL}games`
+        `${process.env.NEXT_PUBLIC_BASE_URL}games`,
       );
       const sorted = response.data.sort(
-        (a: { order: number }, b: { order: number }) => a.order - b.order
+        (a: { orden: number }, b: { orden: number }) => a.orden - b.orden,
       );
       setGames(sorted);
     } catch (error) {

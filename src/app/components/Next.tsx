@@ -1,6 +1,7 @@
 "use client";
 import {
   Box,
+  Button,
   Flex,
   IconButton,
   Input,
@@ -13,6 +14,7 @@ import {
   DndContext,
   closestCenter,
   PointerSensor,
+  type DragEndEvent,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -24,20 +26,36 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import React, { useEffect, useState } from "react";
+import { FiPlus, FiShuffle } from "react-icons/fi";
 import axios from "axios";
 import Card from "./Card";
 
 interface Game {
-  id: string;
+  id: number;
+  igdbId: number;
   title: string;
-  summary: string;
-  artworks: string[];
-  order: number;
-  game?: string;
-  name?: string;
+  synopsis?: string;
+  artworks: number[];
+  orden: number;
+  playStatus: "PLAYING" | "BACKLOG";
 }
 
-function SortableItem({ game }: { game: Game }) {
+interface SearchGame {
+  id: number;
+  name: string;
+  summary?: string;
+  artworks?: number[];
+}
+
+function SortableItem({
+  game,
+  position,
+  onRemove,
+}: {
+  game: Game;
+  position: number;
+  onRemove: (game: Game) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: game.id });
 
@@ -48,8 +66,13 @@ function SortableItem({ game }: { game: Game }) {
   };
 
   return (
-    <Flex ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <Card title={game.title} />
+    <Flex ref={setNodeRef} style={style} w="full" {...attributes}>
+      <Card
+        title={game.title}
+        position={position}
+        onRemove={() => onRemove(game)}
+        dragHandleProps={listeners}
+      />
     </Flex>
   );
 }
@@ -61,16 +84,19 @@ function Next({
   games: Game[];
   refreshGames: () => void;
 }) {
-  const [query, setQuery] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [results, setResults] = useState<Game[]>([]);
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<SearchGame[]>([]);
+  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+  const [isSorting, setIsSorting] = useState(false);
   const { onClose, onOpen } = useDisclosure();
-  const [selectedGame] = useState();
   const sensors = useSensors(useSensor(PointerSensor));
+  const currentGame = games.find((game) => game.playStatus === "PLAYING");
+  const queuedGames = games.filter((game) => game.playStatus === "BACKLOG");
 
   useEffect(() => {
     refreshGames();
-  }, []);
+  }, [refreshGames]);
 
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
@@ -78,12 +104,8 @@ function Next({
         setLoading(true);
         axios
           .get(`${process.env.NEXT_PUBLIC_BASE_URL}search?name=${query}`)
-          .then((res) => {
-            setResults(res.data);
-          })
-          .catch((err) => {
-            console.error("Error al buscar:", err);
-          })
+          .then((res) => setResults(res.data))
+          .catch((error) => console.error("Error al buscar:", error))
           .finally(() => setLoading(false));
       } else {
         setResults([]);
@@ -93,148 +115,213 @@ function Next({
     return () => clearTimeout(delayDebounce);
   }, [query]);
 
-  const addToBacklog = async (game: Game) => {
+  const addToBacklog = async (game: SearchGame) => {
     try {
       const backlogLength = await axios.get(
-        `${process.env.NEXT_PUBLIC_BASE_URL}games/total`
+        `${process.env.NEXT_PUBLIC_BASE_URL}games/total`,
       );
 
-      const newGame = {
-        igdbId: game.id,
-        name: game?.name,
-        summary: game.summary,
-        artworks: game.artworks || [],
-        order: backlogLength.data.total + 1,
-      };
-
       await axios.post(`${process.env.NEXT_PUBLIC_BASE_URL}games`, {
-        newGame,
+        newGame: {
+          igdbId: game.id,
+          name: game.name,
+          summary: game.summary,
+          artworks: game.artworks || [],
+          order: backlogLength.data.total + 1,
+        },
       });
 
-      // getAllGames();
       refreshGames();
+      setQuery("");
+      setResults([]);
       onClose();
     } catch (error) {
       console.error("Error al agregar el juego:", error);
     }
   };
 
-  const handleDragEnd = async (event: {
-    active: { id: string | number };
-    over: { id: string | number } | null;
-  }) => {
+  const persistOrder = async (orderedGames: Game[]) => {
+    await axios.put(`${process.env.NEXT_PUBLIC_BASE_URL}games/reorder`, {
+      orderedGames: orderedGames.map((game, index) => ({
+        id: game.id,
+        order: index + 1,
+      })),
+    });
+    refreshGames();
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-    if (!active || !over || !over.id || active.id === over.id) return;
+    const oldIndex = queuedGames.findIndex(
+      (game) => game.id === Number(active.id),
+    );
+    const newIndex = queuedGames.findIndex(
+      (game) => game.id === Number(over.id),
+    );
+    if (oldIndex < 0 || newIndex < 0) return;
 
-    if (active.id !== over.id) {
-      const oldIndex = games.findIndex((g: Game) => g.id === active.id);
-      const newIndex = games.findIndex((g: Game) => g.id === over.id);
-
-      const newGames = arrayMove(games, oldIndex, newIndex);
-
-      games = newGames;
-
-      // Actualizar backend con el nuevo orden
-      try {
-        const updated = newGames.map((game: Game, index) => ({
-          id: game.id,
-          order: index + 1,
-        }));
-
-        await axios.put(`${process.env.NEXT_PUBLIC_BASE_URL}games/reorder`, {
-          orderedGames: updated,
-        });
-
-        // getAllGames();
-        refreshGames();
-      } catch (error) {
-        console.error("Error al actualizar el orden:", error);
-      }
+    try {
+      const reorderedQueue = arrayMove(queuedGames, oldIndex, newIndex);
+      await persistOrder(
+        currentGame ? [currentGame, ...reorderedQueue] : reorderedQueue,
+      );
+    } catch (error) {
+      console.error("Error al actualizar el orden:", error);
     }
   };
 
-  useEffect(() => {
-    if (selectedGame) {
-      addToBacklog(selectedGame);
-      handleDragEnd(selectedGame);
+  const shuffleNext = async () => {
+    if (queuedGames.length === 0) return;
+
+    const randomGame =
+      queuedGames[Math.floor(Math.random() * queuedGames.length)];
+    const shuffledGames = [
+      ...(currentGame ? [currentGame] : []),
+      randomGame,
+      ...queuedGames.filter((game) => game.id !== randomGame.id),
+    ];
+
+    setIsSorting(true);
+    setSelectedGame(randomGame);
+    try {
+      await persistOrder(shuffledGames);
+    } catch (error) {
+      console.error("Error al sortear el próximo juego:", error);
+      setSelectedGame(null);
+    } finally {
+      setIsSorting(false);
     }
-  }, []);
+  };
+
+  const removeFromBacklog = async (game: Game) => {
+    try {
+      await axios.delete(`${process.env.NEXT_PUBLIC_BASE_URL}games`, {
+        data: { igdbId: game.igdbId },
+      });
+      refreshGames();
+    } catch (error) {
+      console.error("Error al quitar el juego:", error);
+    }
+  };
 
   return (
-    <Flex flexDirection={"column"} justifyContent={"center"} w={600}>
-      <Flex justifyContent="start" alignItems="center" mb={4} w={"full"}>
-        <Box position="relative">
-          <Popover.Root>
-            <Popover.Trigger asChild>
-              <IconButton
-                aria-label="Add"
-                backgroundColor="transparent"
-                color="white"
-                fontWeight="bold"
-                fontSize="3xl"
-                onClick={onOpen}
-              >
-                +
-              </IconButton>
-            </Popover.Trigger>
-
-            <Popover.Content
-              bg="gray.800"
+    <Flex flexDirection="column" justifyContent="center" w="full" maxW="600px">
+      <Flex justifyContent="space-between" alignItems="center" mb={5} gap={3}>
+        <Popover.Root>
+          <Popover.Trigger asChild>
+            <IconButton
+              aria-label="Agregar juego"
+              backgroundColor="transparent"
               color="white"
-              p={3}
-              zIndex="1"
-              _focus={{ boxShadow: "none" }}
-              position={"absolute"}
+              size="sm"
+              onClick={onOpen}
             >
-              <Popover.Arrow />
-              <Input
-                placeholder="Buscar juego"
-                size="md"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                mb={2}
-                p={2}
-              />
-              {loading && (
-                <Flex justify="center" p={3}>
-                  <Spinner size="sm" />
-                </Flex>
-              )}
-              {!loading && results.length > 0 && (
-                <Flex direction="column" gap={1} maxH="200px" overflowY="auto">
-                  {results.map((game) => (
-                    <Box
-                      key={game.id}
-                      px={3}
-                      py={2}
-                      _hover={{ bg: "whiteAlpha.200", cursor: "pointer" }}
-                      borderRadius="md"
-                      onClick={() => {
-                        addToBacklog(game);
-                        setQuery("");
-                        setResults([]);
-                        onClose();
-                      }}
-                    >
-                      {game.name}
-                    </Box>
-                  ))}
-                </Flex>
-              )}
-              {!loading && query && results.length === 0 && (
-                <Text p={3} fontSize="sm" color="gray.400">
-                  Sin resultados.
-                </Text>
-              )}
-            </Popover.Content>
-          </Popover.Root>
-        </Box>
+              <FiPlus />
+            </IconButton>
+          </Popover.Trigger>
+          <Popover.Content bg="gray.800" color="white" p={3} zIndex="1">
+            <Popover.Arrow />
+            <Input
+              placeholder="Buscar juego"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              mb={2}
+            />
+            {loading && <Spinner size="sm" />}
+            {!loading && results.length > 0 && (
+              <Flex direction="column" gap={1} maxH="200px" overflowY="auto">
+                {results.map((game) => (
+                  <Box
+                    key={game.id}
+                    px={3}
+                    py={2}
+                    borderRadius="md"
+                    _hover={{ bg: "whiteAlpha.200", cursor: "pointer" }}
+                    onClick={() => addToBacklog(game)}
+                  >
+                    {game.name}
+                  </Box>
+                ))}
+              </Flex>
+            )}
+            {!loading && query && results.length === 0 && (
+              <Text p={3} fontSize="sm" color="gray.400">
+                Sin resultados.
+              </Text>
+            )}
+          </Popover.Content>
+        </Popover.Root>
 
-        <Text fontSize="4xl" fontWeight="bold">
-          Play next:
-        </Text>
+        <Flex alignItems="center" gap={3} flex="1">
+          <Text fontSize={{ base: "2xl", md: "3xl" }} fontWeight="bold">
+            Próximos juegos
+          </Text>
+          <Text color="whiteAlpha.600" fontSize="sm" whiteSpace="nowrap">
+            {queuedGames.length} en cola
+          </Text>
+        </Flex>
+
+        <Button
+          size="sm"
+          variant="outline"
+          colorPalette="yellow"
+          loading={isSorting}
+          disabled={games.length < 2}
+          onClick={shuffleNext}
+        >
+          <FiShuffle />
+          Sortear próximo
+        </Button>
       </Flex>
+
+      {selectedGame && !isSorting && (
+        <Flex
+          alignItems="center"
+          justifyContent="space-between"
+          gap={3}
+          mb={4}
+          px={4}
+          py={3}
+          borderRadius="md"
+          bg="yellow.900"
+          border="1px solid"
+          borderColor="yellow.600"
+        >
+          <Box minW={0}>
+            <Text
+              color="yellow.200"
+              fontSize="xs"
+              fontWeight="bold"
+              textTransform="uppercase"
+            >
+              Próximo juego
+            </Text>
+            <Text
+              fontWeight="bold"
+              overflow="hidden"
+              textOverflow="ellipsis"
+              whiteSpace="nowrap"
+            >
+              {selectedGame.title}
+            </Text>
+          </Box>
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => setSelectedGame(null)}
+          >
+            Ocultar
+          </Button>
+        </Flex>
+      )}
+
+      {queuedGames.length === 0 && (
+        <Text color="whiteAlpha.600" py={8} textAlign="center">
+          La cola está vacía. Agrega juegos para empezar.
+        </Text>
+      )}
 
       <DndContext
         sensors={sensors}
@@ -242,12 +329,19 @@ function Next({
         onDragEnd={handleDragEnd}
       >
         <SortableContext
-          items={games.map((g: Game) => g.id)}
+          items={queuedGames.map((game) => game.id)}
           strategy={verticalListSortingStrategy}
         >
-          {games.slice(1).map((game: Game) => (
-            <SortableItem key={game.id} game={game} />
-          ))}
+          <Flex direction="column" gap={2}>
+            {queuedGames.map((game, index) => (
+              <SortableItem
+                key={game.id}
+                game={game}
+                position={index + 2}
+                onRemove={removeFromBacklog}
+              />
+            ))}
+          </Flex>
         </SortableContext>
       </DndContext>
     </Flex>
