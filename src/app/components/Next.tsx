@@ -98,6 +98,7 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
   const [addingId, setAddingId] = useState<number | null>(null);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isSorting, setIsSorting] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
   const { open, onClose, onOpen } = useDisclosure();
   const sensors = useSensors(useSensor(PointerSensor));
   const currentGame = games.find((game) => game.playStatus === "PLAYING");
@@ -177,13 +178,22 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
   };
 
   const persistOrder = async (orderedGames: Game[]) => {
-    await axios.put(`${process.env.NEXT_PUBLIC_BASE_URL}games/reorder`, {
+    return axios.put(`${process.env.NEXT_PUBLIC_BASE_URL}games/reorder`, {
       orderedGames: orderedGames.map((game, index) => ({
         id: game.id,
         order: index + 1,
       })),
     });
-    refreshGames();
+  };
+
+  const applyLocalOrder = (orderedGames: Game[]) => {
+    setGames(
+      orderedGames.map((game, index) => ({
+        ...game,
+        orden: index + 1,
+        playStatus: index === 0 ? "PLAYING" : "BACKLOG",
+      })),
+    );
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -198,13 +208,20 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
     );
     if (oldIndex < 0 || newIndex < 0) return;
 
+    const reorderedQueue = arrayMove(queuedGames, oldIndex, newIndex);
+    const orderedGames = currentGame
+      ? [currentGame, ...reorderedQueue]
+      : reorderedQueue;
+
+    applyLocalOrder(orderedGames);
+    setIsReordering(true);
     try {
-      const reorderedQueue = arrayMove(queuedGames, oldIndex, newIndex);
-      await persistOrder(
-        currentGame ? [currentGame, ...reorderedQueue] : reorderedQueue,
-      );
+      await persistOrder(orderedGames);
     } catch (error) {
       console.error("Error al actualizar el orden:", error);
+      await refreshGames();
+    } finally {
+      setIsReordering(false);
     }
   };
 
@@ -221,11 +238,13 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
 
     setIsSorting(true);
     setSelectedGame(randomGame);
+    applyLocalOrder(shuffledGames);
     try {
       await persistOrder(shuffledGames);
     } catch (error) {
       console.error("Error al sortear el próximo juego:", error);
       setSelectedGame(null);
+      await refreshGames();
     } finally {
       setIsSorting(false);
     }
