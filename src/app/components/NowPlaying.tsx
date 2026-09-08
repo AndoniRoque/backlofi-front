@@ -40,10 +40,6 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
     text: string;
   } | null>(null);
   const [igdbId, setIgdbId] = useState<number>(0);
-  const [imgDimensions, setImgDimensions] = useState({
-    width: 700,
-    height: 500,
-  });
 
   const fetchCurrentGame = useCallback(async () => {
     setIsLoading(true);
@@ -84,11 +80,6 @@ function NowPlaying({ onGameChange }: NowPlayingProps) {
 
         const img = new window.Image();
         img.onload = () => {
-          const maxWidth = 700;
-          const aspectRatio = img.width / img.height;
-          const newWidth = Math.min(img.width, maxWidth);
-          const newHeight = newWidth / aspectRatio;
-          setImgDimensions({ width: newWidth, height: newHeight });
           setImageLoaded(true);
           setIsLoading(false);
         };

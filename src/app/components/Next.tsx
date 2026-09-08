@@ -106,7 +106,6 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
   const [addingId, setAddingId] = useState<number | null>(null);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isSorting, setIsSorting] = useState(false);
-  const [isReordering, setIsReordering] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<Game | null>(null);
   const [undoRemoval, setUndoRemoval] = useState<Game | null>(null);
@@ -273,7 +272,6 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
       : reorderedQueue;
 
     applyLocalOrder(orderedGames);
-    setIsReordering(true);
     showFeedback({ tone: "saving", message: "Saving queue order..." });
     try {
       await persistOrder(orderedGames);
@@ -285,8 +283,6 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
         tone: "error",
         message: "Could not save the queue order.",
       });
-    } finally {
-      setIsReordering(false);
     }
   };
 
