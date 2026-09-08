@@ -78,6 +78,12 @@ export default function Card({
             objectFit="cover"
             opacity={0.72}
             zIndex={0}
+            css={{
+              maskImage:
+                "linear-gradient(to right, transparent 0%, black 48%, black 100%)",
+              WebkitMaskImage:
+                "linear-gradient(to right, transparent 0%, black 48%, black 100%)",
+            }}
           />
           <Box
             position="absolute"
@@ -113,7 +119,7 @@ export default function Card({
           {title}
         </Text>
         <Text color="whiteAlpha.600" fontSize="xs" mt={1}>
-          En cola
+          in queue
         </Text>
       </Box>
 
