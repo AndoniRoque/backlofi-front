@@ -56,6 +56,8 @@ interface SearchGame {
   artworks?: number[];
   cover?: { url?: string };
   first_release_date?: number;
+  genres?: { name: string }[];
+  platforms?: { name: string }[];
 }
 
 type Feedback = {
@@ -99,6 +101,8 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState(false);
+  const [genreFilter, setGenreFilter] = useState("");
+  const [platformFilter, setPlatformFilter] = useState("");
   const [results, setResults] = useState<SearchGame[]>([]);
   const [addingId, setAddingId] = useState<number | null>(null);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
@@ -112,6 +116,26 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
   const sensors = useSensors(useSensor(PointerSensor));
   const currentGame = games.find((game) => game.playStatus === "PLAYING");
   const queuedGames = games.filter((game) => game.playStatus === "BACKLOG");
+  const availableGenres = Array.from(
+    new Set(
+      results.flatMap((game) => game.genres?.map((genre) => genre.name) || []),
+    ),
+  ).sort();
+  const availablePlatforms = Array.from(
+    new Set(
+      results.flatMap(
+        (game) => game.platforms?.map((platform) => platform.name) || [],
+      ),
+    ),
+  ).sort();
+  const filteredResults = results.filter((game) => {
+    const matchesGenre =
+      !genreFilter || game.genres?.some((genre) => genre.name === genreFilter);
+    const matchesPlatform =
+      !platformFilter ||
+      game.platforms?.some((platform) => platform.name === platformFilter);
+    return matchesGenre && matchesPlatform;
+  });
 
   const showFeedback = useCallback((nextFeedback: Feedback) => {
     setFeedback(nextFeedback);
@@ -191,6 +215,8 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
       await refreshGames();
       setQuery("");
       setResults([]);
+      setGenreFilter("");
+      setPlatformFilter("");
       onClose();
       showFeedback({
         tone: "success",
@@ -198,7 +224,14 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
       });
     } catch (error) {
       console.error("Error al agregar el juego:", error);
-      showFeedback({ tone: "error", message: "Could not add that game." });
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        showFeedback({
+          tone: "error",
+          message: "That game is already in your library.",
+        });
+      } else {
+        showFeedback({ tone: "error", message: "Could not add that game." });
+      }
     } finally {
       setAddingId(null);
     }
@@ -400,6 +433,63 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
                   px={2}
                 />
               </Flex>
+              {(availableGenres.length > 0 ||
+                availablePlatforms.length > 0) && (
+                <Flex gap={2} mb={3} px={2}>
+                  <select
+                    value={genreFilter}
+                    onChange={(event) => setGenreFilter(event.target.value)}
+                    style={{
+                      flex: 1,
+                      background: "rgba(255, 255, 255, 0.1)",
+                      color: "white",
+                      border: "1px solid rgba(255, 255, 255, 0.3)",
+                      borderRadius: "4px",
+                      padding: "4px 8px",
+                      fontSize: "12px",
+                    }}
+                  >
+                    <option value="" style={{ background: "#1a202c" }}>
+                      All genres
+                    </option>
+                    {availableGenres.map((genre) => (
+                      <option
+                        key={genre}
+                        value={genre}
+                        style={{ background: "#1a202c" }}
+                      >
+                        {genre}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={platformFilter}
+                    onChange={(event) => setPlatformFilter(event.target.value)}
+                    style={{
+                      flex: 1,
+                      background: "rgba(255, 255, 255, 0.1)",
+                      color: "white",
+                      border: "1px solid rgba(255, 255, 255, 0.3)",
+                      borderRadius: "4px",
+                      padding: "4px 8px",
+                      fontSize: "12px",
+                    }}
+                  >
+                    <option value="" style={{ background: "#1a202c" }}>
+                      All platforms
+                    </option>
+                    {availablePlatforms.map((platform) => (
+                      <option
+                        key={platform}
+                        value={platform}
+                        style={{ background: "#1a202c" }}
+                      >
+                        {platform}
+                      </option>
+                    ))}
+                  </select>
+                </Flex>
+              )}
               <Box minH="120px" overflow="hidden">
                 {query.trim().length > 0 && query.trim().length < 3 && (
                   <Text color="whiteAlpha.600" fontSize="sm" px={2} py={3}>
@@ -414,7 +504,7 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
                     </Text>
                   </Flex>
                 )}
-                {!loading && results.length > 0 && (
+                {!loading && filteredResults.length > 0 && (
                   <Flex
                     direction="column"
                     gap={1}
@@ -422,7 +512,7 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
                     overflowY="auto"
                     p={2}
                   >
-                    {results.map((game) => (
+                    {filteredResults.map((game) => (
                       <Flex
                         key={game.id}
                         alignItems="center"
@@ -468,6 +558,24 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
                                 ).getFullYear()
                               : "Año desconocido"}
                           </Text>
+                          {(game.genres?.length || game.platforms?.length) && (
+                            <Text
+                              fontSize="xs"
+                              color="whiteAlpha.500"
+                              overflow="hidden"
+                              textOverflow="ellipsis"
+                              whiteSpace="nowrap"
+                            >
+                              {[
+                                ...(game.genres || []).map(
+                                  (genre) => genre.name,
+                                ),
+                                ...(game.platforms || [])
+                                  .slice(0, 2)
+                                  .map((platform) => platform.name),
+                              ].join(" · ")}
+                            </Text>
+                          )}
                         </Box>
                         <Button
                           size="xs"
@@ -497,7 +605,7 @@ function Next({ refreshTrigger = 0 }: { refreshTrigger?: number }) {
                 {!loading &&
                   !searchError &&
                   query.trim().length > 2 &&
-                  results.length === 0 && (
+                  filteredResults.length === 0 && (
                     <Text p={3} fontSize="sm" color="gray.400">
                       No results found.
                     </Text>
